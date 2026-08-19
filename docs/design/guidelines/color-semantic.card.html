@@ -1,0 +1,25 @@
+<!-- @dsCard group="Colors" viewport="700x160" name="Semantic — status" subtitle="Emerald, red, amber, sky — meaning, never decoration" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body{margin:0;padding:20px;background:var(--color-surface);font-family:var(--font-sans)}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .col{display:flex;flex-direction:column;gap:6px}
+  .solid{height:52px;border-radius:var(--radius-md);display:flex;align-items:flex-end;padding:7px;box-sizing:border-box;color:#fff;font-size:11px;font-weight:600}
+  .tintbar{height:26px;border-radius:var(--radius-md);display:flex;align-items:center;padding:0 8px;box-sizing:border-box;font-size:11px;font-weight:600}
+  .name{font-size:10px;color:var(--color-fg-muted);font-family:var(--font-mono)}
+</style>
+</head>
+<body>
+<div class="grid">
+  <div class="col"><div class="solid" style="background:var(--color-success)">Success</div><div class="tintbar" style="background:var(--color-success-bg-subtle);border:1px solid var(--color-success-border);color:var(--color-success-fg)">tint</div><span class="name">emerald-600</span></div>
+  <div class="col"><div class="solid" style="background:var(--color-danger)">Danger</div><div class="tintbar" style="background:var(--color-danger-bg-subtle);border:1px solid var(--color-danger-border);color:var(--color-danger-fg)">tint</div><span class="name">red-600</span></div>
+  <div class="col"><div class="solid" style="background:var(--color-warning);color:var(--color-warning-on-solid)">Warning</div><div class="tintbar" style="background:var(--color-warning-bg-subtle);border:1px solid var(--color-warning-border);color:var(--color-warning-fg)">tint</div><span class="name">amber-500</span></div>
+  <div class="col"><div class="solid" style="background:var(--color-info)">Info / accent</div><div class="tintbar" style="background:var(--color-info-bg-subtle);border:1px solid var(--color-info-border);color:var(--color-info-fg)">tint</div><span class="name">sky-600 / sky-500</span></div>
+</div>
+<p style="margin:12px 0 0;font-size:11px;color:var(--color-fg-muted)">Each family exposes four roles: <b>solid</b> · <b>-fg</b> (text on neutral surface) · <b>-bg-subtle</b> + <b>-border</b> (tinted container). Warning fills take dark text, never white.</p>
+</body>
+</html>

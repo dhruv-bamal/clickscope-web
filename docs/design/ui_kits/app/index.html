@@ -1,0 +1,86 @@
+<!-- @dsCard group="App" viewport="1360x860" name="Web app" subtitle="Sign in → dashboard, links, analytics, detail, settings" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Click Scope — App</title>
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>html,body,#root{height:100%}body{margin:0}</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="data.js"></script>
+<script type="text/babel" src="Charts.jsx"></script>
+<script type="text/babel" src="AppShell.jsx"></script>
+<script type="text/babel" src="DashboardScreen.jsx"></script>
+<script type="text/babel" src="LinksScreen.jsx"></script>
+<script type="text/babel" src="AnalyticsScreen.jsx"></script>
+<script type="text/babel" src="LinkDetailScreen.jsx"></script>
+<script type="text/babel" src="SettingsScreen.jsx"></script>
+<script type="text/babel" src="Overlays.jsx"></script>
+<script type="text/babel">
+const { Toast } = window.ClickScopeDesignSystem_0a7fd7;
+
+function App() {
+  const [authed, setAuthed] = React.useState(true);
+  const [route, setRoute] = React.useState("dashboard");
+  const [detail, setDetail] = React.useState(null);
+  const [modal, setModal] = React.useState(false);
+  const [dark, setDark] = React.useState(false);
+  const [toasts, setToasts] = React.useState([]);
+
+  React.useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    document.body.style.background = "var(--color-canvas)";
+  }, [dark]);
+
+  const toast = (t) => {
+    const id = Math.random().toString(36).slice(2);
+    setToasts((ts) => [...ts, { ...t, id }]);
+    setTimeout(() => setToasts((ts) => ts.filter((x) => x.id !== id)), 4000);
+  };
+  const openDetail = (l) => { setDetail(l); setRoute("detail"); };
+  const createLink = (l) => { setModal(false); toast({ variant: "success", title: "Link created", detail: "short.link/" + l.alias + " is live" }); setRoute("links"); };
+
+  if (!authed) return <SignInScreen onSignIn={() => setAuthed(true)} />;
+
+  let screen;
+  if (route === "dashboard") screen = <DashboardScreen setRoute={setRoute} openDetail={openDetail} />;
+  else if (route === "links") screen = <LinksScreen openDetail={openDetail} onNew={() => setModal(true)} toast={toast} />;
+  else if (route === "analytics") screen = <AnalyticsScreen />;
+  else if (route === "settings") screen = <SettingsScreen dark={dark} onToggleTheme={() => setDark((d) => !d)} />;
+  else if (route === "detail" && detail) screen = <LinkDetailScreen link={detail} back={() => setRoute("links")} toast={toast} />;
+
+  const navRoute = route === "detail" ? "links" : route;
+
+  return (
+    <>
+      <AppShell
+        route={navRoute}
+        setRoute={setRoute}
+        onNew={() => setModal(true)}
+        dark={dark}
+        onToggleTheme={() => setDark((d) => !d)}
+        onSignOut={() => setAuthed(false)}
+      >
+        {screen}
+      </AppShell>
+      <CreateLinkModal open={modal} onClose={() => setModal(false)} onCreate={createLink} />
+      <div style={{ position: "fixed", right: 20, bottom: 20, display: "flex", flexDirection: "column", gap: 10, zIndex: 60 }}>
+        {toasts.map((t) => (
+          <Toast key={t.id} variant={t.variant} title={t.title} detail={t.detail} onDismiss={() => setToasts((ts) => ts.filter((x) => x.id !== t.id))} />
+        ))}
+      </div>
+    </>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

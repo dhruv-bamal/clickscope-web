@@ -1,0 +1,30 @@
+<!-- @dsCard group="Spacing" viewport="700x160" name="Spacing scale" subtitle="Named subset: 1 2 3 4 6 8 12 16 24" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body{margin:0;padding:22px;background:var(--color-surface);font-family:var(--font-sans);color:var(--color-fg)}
+  .row{display:flex;align-items:flex-end;gap:16px}
+  .u{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .bar{background:var(--color-primary);border-radius:2px;width:100%}
+  .u b{font-size:11px;font-weight:600}
+  .u small{font-family:var(--font-mono);font-size:9px;color:var(--color-fg-subtle)}
+</style>
+</head>
+<body>
+<div class="row">
+  <div class="u" style="width:20px"><div class="bar" style="height:4px"></div><b>1</b><small>4px</small></div>
+  <div class="u" style="width:20px"><div class="bar" style="height:8px"></div><b>2</b><small>8</small></div>
+  <div class="u" style="width:26px"><div class="bar" style="height:12px"></div><b>3</b><small>12</small></div>
+  <div class="u" style="width:30px"><div class="bar" style="height:16px"></div><b>4</b><small>16</small></div>
+  <div class="u" style="width:38px"><div class="bar" style="height:24px"></div><b>6</b><small>24</small></div>
+  <div class="u" style="width:46px"><div class="bar" style="height:32px"></div><b>8</b><small>32</small></div>
+  <div class="u" style="width:60px"><div class="bar" style="height:48px"></div><b>12</b><small>48</small></div>
+  <div class="u" style="width:72px"><div class="bar" style="height:64px"></div><b>16</b><small>64</small></div>
+  <div class="u" style="width:96px"><div class="bar" style="height:96px"></div><b>24</b><small>96</small></div>
+</div>
+<p style="margin:14px 0 0;font-size:11px;color:var(--color-fg-muted)">Dense inside data regions (3–4); generous (6+) only for marketing and empty states. A value outside this set is the signal to reconsider.</p>
+</body>
+</html>

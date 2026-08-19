@@ -1,0 +1,72 @@
+<!-- @dsCard group="Components" viewport="700x760" name="Cards, badges, table & chart" subtitle="Link/stat cards, badges, tags, data table, analytics chart" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body{margin:0;padding:24px;background:var(--color-canvas);font-family:var(--font-sans);color:var(--color-fg)}
+  .stack{display:flex;flex-direction:column;gap:20px}
+  .eyebrow{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-fg-muted);margin-bottom:10px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const NS = window.ClickScopeDesignSystem_0a7fd7;
+const { LinkCard, StatCard, Badge, DataTable, TableBar, Tag, AnalyticsChart } = NS;
+const trend = [280,310,290,340,420,390,360,410,480,520,470,510,560,540,610,590,640,700,680,650,720,760,740,810,790,850,880,860,910,980];
+function Demo(){
+  return (
+    <div className="stack">
+      <div>
+        <div className="eyebrow">Status badges</div>
+        <div className="row">
+          <Badge status="active" /><Badge status="expiring" /><Badge status="expired" /><Badge status="protected" /><Badge status="paused" />
+        </div>
+      </div>
+      <div className="grid2">
+        <StatCard label="Total clicks" value="24,819" delta="+12.4% vs last week" direction="up" />
+        <StatCard label="Active links" value="142" delta="-3 this week" direction="down" />
+      </div>
+      <LinkCard shortUrl="short.link/launch" destination="https://acme.com/2026/spring-launch-campaign" status="active" clicks={1284} created="Mar 4" onCopy={()=>{}} onQr={()=>{}} onMenu={()=>{}} />
+      <div>
+        <div className="eyebrow">Tags</div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <Tag>launch</Tag><Tag>campaign</Tag><Tag>q2</Tag><Tag tone="primary" onRemove={()=>{}}>Status: Active</Tag>
+        </div>
+      </div>
+      <div>
+        <div className="eyebrow">Analytics chart (area, sky accent)</div>
+        <div className="cs-card" style={{padding:16}}><AnalyticsChart data={trend} height={180} labels={trend.map((_,i)=>`Mar ${i+1}`)} /></div>
+      </div>
+      <div>
+        <div className="eyebrow">Analytics breakdown</div>
+        <DataTable
+          columns={[
+            { key:"ref", header:"Referrer" },
+            { key:"pct", header:"Share", render:r => <TableBar pct={r.pct} /> },
+            { key:"clicks", header:"Clicks", align:"right" },
+          ]}
+          rows={[
+            { ref:"google.com", pct:64, clicks:"7,914" },
+            { ref:"twitter.com", pct:22, clicks:"2,701" },
+            { ref:"newsletter", pct:14, clicks:"1,689" },
+          ]}
+          getRowKey={r=>r.ref}
+        />
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo/>);
+</script>
+</body>
+</html>

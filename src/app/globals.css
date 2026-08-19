@@ -1,0 +1,7 @@
+/* Single entry point for the Click Scope design system — imported once here,
+   which layout.tsx pulls in exactly once via `import "./globals.css"`.
+   Next's default reset/tokens (Arial fallback, generic --background/--foreground)
+   are dropped in favor of the design system's own base.css reset and
+   --color-canvas/--color-fg tokens, which every component is built against. */
+
+@import "../styles/design-system/index.css";

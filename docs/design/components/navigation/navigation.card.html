@@ -1,0 +1,50 @@
+<!-- @dsCard group="Components" viewport="700x340" name="Filter bar & bulk actions" subtitle="Link-list search + status + pills; selected-rows toolbar" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body{margin:0;padding:24px;background:var(--color-canvas);font-family:var(--font-sans);color:var(--color-fg)}
+  .stack{display:flex;flex-direction:column;gap:22px}
+  .eyebrow{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-fg-muted);margin-bottom:10px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { FilterBar, BulkActionToolbar } = window.ClickScopeDesignSystem_0a7fd7;
+function Demo(){
+  const [q,setQ] = React.useState("");
+  const [status,setStatus] = React.useState("active");
+  const pills = status !== "all" ? [{ label: "Status: Active", onRemove: () => setStatus("all") }, { label: "Tag: launch", onRemove: () => {} }] : [];
+  return (
+    <div className="stack">
+      <div>
+        <div className="eyebrow">Filter bar — inline (md+)</div>
+        <FilterBar query={q} onQuery={setQ} status={status} onStatus={setStatus} pills={pills} onClear={()=>{setQ("");setStatus("all");}} />
+      </div>
+      <div>
+        <div className="eyebrow">Filter bar — mobile collapsed</div>
+        <FilterBar mobile activeCount={2} onOpenFilters={()=>{}} />
+      </div>
+      <div>
+        <div className="eyebrow">Bulk-action toolbar (rows selected)</div>
+        <BulkActionToolbar count={3} onClear={()=>{}} actions={[
+          { label:"Add tag", icon:"tag" },
+          { label:"Pause", icon:"pause" },
+          { label:"Delete", icon:"trash-2", variant:"destructive" },
+        ]} />
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo/>);
+</script>
+</body>
+</html>

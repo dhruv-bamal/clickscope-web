@@ -1,0 +1,11 @@
+/* Click Scope design system — import manifest.
+   Ported from docs/design/styles.css. Font loading is handled by next/font
+   (see src/app/layout.tsx) instead of tokens/fonts.css's CDN @import — see the
+   note at the top of tokens/typography.css. Load order otherwise matches the
+   source bundle: tokens (colors, typography, spacing) -> base -> components. */
+
+@import "./tokens/colors.css";
+@import "./tokens/typography.css";
+@import "./tokens/spacing.css";
+@import "./css/base.css";
+@import "./css/components.css";

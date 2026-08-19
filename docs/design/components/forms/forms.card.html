@@ -1,0 +1,72 @@
+<!-- @dsCard group="Components" viewport="700x520" name="Buttons, inputs & controls" subtitle="Variants, sizes, states — the form primitives" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body{margin:0;padding:24px;background:var(--color-canvas);font-family:var(--font-sans);color:var(--color-fg)}
+  .stack{display:flex;flex-direction:column;gap:22px}
+  .row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+  .eyebrow{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-fg-muted);margin-bottom:10px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .divide{height:1px;background:var(--color-border)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const NS = window.ClickScopeDesignSystem_0a7fd7;
+const { Button, IconButton, Input, Select, Checkbox, Toggle, SegmentedControl } = NS;
+function Demo(){
+  const [on,setOn] = React.useState(true);
+  const [chk,setChk] = React.useState(true);
+  const [range,setRange] = React.useState("7d");
+  return (
+    <div className="stack">
+      <div>
+        <div className="eyebrow">Buttons — one filled indigo per view</div>
+        <div className="row">
+          <Button variant="primary" icon="plus">Create link</Button>
+          <Button variant="secondary">Cancel</Button>
+          <Button variant="ghost" icon="sliders-horizontal">Filter</Button>
+          <Button variant="destructive" icon="trash-2">Delete</Button>
+          <Button variant="link">Learn more</Button>
+        </div>
+      </div>
+      <div className="row">
+        <Button variant="primary" size="sm">Small</Button>
+        <Button variant="primary" size="md">Medium</Button>
+        <Button variant="primary" size="lg">Large</Button>
+        <Button variant="primary" loading>Saving</Button>
+        <Button variant="primary" disabled>Disabled</Button>
+        <IconButton icon="copy" label="Copy" />
+        <IconButton icon="qr-code" label="QR" variant="secondary" />
+        <IconButton icon="ellipsis-vertical" label="Menu" />
+      </div>
+      <div className="divide"></div>
+      <div className="cols">
+        <Input label="Destination URL" placeholder="https://example.com/path" />
+        <Input label="Custom alias" mono prefix="short.link/" defaultValue="launch" success="Alias available" />
+        <Input label="Password" type="password" defaultValue="hunter2" error="Incorrect password" />
+        <Select label="Expiration" options={[{value:"never",label:"Never"},{value:"7d",label:"In 7 days"},{value:"30d",label:"In 30 days"}]} />
+      </div>
+      <div className="divide"></div>
+      <div className="row" style={{gap:32}}>
+        <Checkbox checked={chk} onChange={e=>setChk(e.target.checked)} label="Require password" />
+        <Checkbox indeterminate label="Select all" />
+        <Toggle on={on} onChange={setOn} label="Link active" />
+        <SegmentedControl value={range} onChange={setRange} options={["24h","7d","30d"]} aria-label="Range" />
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo/>);
+</script>
+</body>
+</html>

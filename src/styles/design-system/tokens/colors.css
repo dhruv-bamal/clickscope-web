@@ -1,0 +1,181 @@
+/* Click Scope — color system (aligned to design_v2.md §3).
+   Tailwind v4 default palette (oklch) as raw scales, then semantic aliases.
+   v2: every semantic family exposes a FULL four-role set —
+     solid (bare name) · -fg (text/icon on a neutral surface) ·
+     -bg-subtle (tinted container) · -border (tinted-container border).
+   `-tint` is retained as a back-compat alias of `-bg-subtle`.
+   Product/components consume ONLY the semantic tokens; the .dark block
+   re-points surface/text/semantic tokens (semantics shift one step for
+   contrast on dark surfaces) while the raw palette stays fixed. */
+
+:root {
+  /* ── Raw palette — slate (neutral / structure) ── */
+  --color-slate-50: oklch(0.984 0.003 247.858);
+  --color-slate-100: oklch(0.968 0.007 247.896);
+  --color-slate-200: oklch(0.929 0.013 255.508);
+  --color-slate-300: oklch(0.869 0.022 252.894);
+  --color-slate-400: oklch(0.704 0.04 256.788);
+  --color-slate-500: oklch(0.554 0.046 257.417);
+  --color-slate-600: oklch(0.446 0.043 257.281);
+  --color-slate-700: oklch(0.372 0.044 257.287);
+  --color-slate-800: oklch(0.279 0.041 260.031);
+  --color-slate-900: oklch(0.208 0.042 265.755);
+  --color-slate-950: oklch(0.129 0.042 264.695);
+  --color-white: #fff;
+
+  /* ── Raw palette — indigo (primary / brand / action) ── */
+  --color-indigo-50: oklch(0.962 0.018 272.314);
+  --color-indigo-100: oklch(0.93 0.034 272.788);
+  --color-indigo-200: oklch(0.87 0.065 274.039);
+  --color-indigo-300: oklch(0.785 0.115 274.713);
+  --color-indigo-400: oklch(0.673 0.182 276.935);
+  --color-indigo-500: oklch(0.585 0.233 277.117);
+  --color-indigo-600: oklch(0.511 0.262 276.966);
+  --color-indigo-700: oklch(0.457 0.24 277.023);
+  --color-indigo-800: oklch(0.398 0.195 277.366);
+  --color-indigo-900: oklch(0.359 0.144 278.697);
+  --color-indigo-950: oklch(0.257 0.09 281.288);
+
+  /* ── Raw palette — emerald (success) ── */
+  --color-emerald-50: oklch(0.979 0.021 166.113);
+  --color-emerald-200: oklch(0.905 0.093 164.15);
+  --color-emerald-300: oklch(0.845 0.143 164.978);
+  --color-emerald-500: oklch(0.696 0.17 162.48);
+  --color-emerald-600: oklch(0.596 0.145 163.225);
+  --color-emerald-700: oklch(0.508 0.118 165.612);
+  --color-emerald-800: oklch(0.432 0.095 166.913);
+  --color-emerald-950: oklch(0.262 0.051 172.552);
+
+  /* ── Raw palette — red (danger) ── */
+  --color-red-50: oklch(0.971 0.013 17.38);
+  --color-red-200: oklch(0.885 0.062 18.334);
+  --color-red-300: oklch(0.808 0.114 19.571);
+  --color-red-500: oklch(0.637 0.237 25.331);
+  --color-red-600: oklch(0.577 0.245 27.325);
+  --color-red-700: oklch(0.505 0.213 27.518);
+  --color-red-800: oklch(0.444 0.177 26.899);
+  --color-red-950: oklch(0.258 0.092 26.042);
+
+  /* ── Raw palette — amber (warning) ── */
+  --color-amber-50: oklch(0.987 0.022 95.277);
+  --color-amber-200: oklch(0.924 0.12 95.746);
+  --color-amber-300: oklch(0.879 0.169 91.605);
+  --color-amber-400: oklch(0.828 0.189 84.429);
+  --color-amber-500: oklch(0.769 0.188 70.08);
+  --color-amber-700: oklch(0.555 0.163 48.998);
+  --color-amber-800: oklch(0.473 0.137 46.201);
+  --color-amber-950: oklch(0.279 0.077 45.635);
+
+  /* ── Raw palette — sky (info / accent / charts) ── */
+  --color-sky-50: oklch(0.977 0.013 236.62);
+  --color-sky-100: oklch(0.951 0.026 236.824);
+  --color-sky-200: oklch(0.901 0.058 230.902);
+  --color-sky-300: oklch(0.828 0.111 230.318);
+  --color-sky-500: oklch(0.685 0.169 237.323);
+  --color-sky-600: oklch(0.588 0.158 241.966);
+  --color-sky-700: oklch(0.5 0.134 242.749);
+  --color-sky-800: oklch(0.443 0.11 240.79);
+  --color-sky-950: oklch(0.293 0.066 243.157);
+
+  /* ── Semantic — brand / action ── */
+  --color-primary: var(--color-indigo-600);
+  --color-primary-hover: var(--color-indigo-700);
+  --color-primary-active: var(--color-indigo-800);
+  --color-primary-fg: var(--color-white); /* text/icon on a primary fill */
+  --color-primary-tint: var(--color-indigo-50); /* selected/active surface */
+  --color-primary-tint-fg: var(--color-indigo-700);
+  --color-ring: var(--color-indigo-500); /* focus ring */
+
+  /* ── Accent (data-viz + info) ── */
+  --color-accent: var(--color-sky-500);
+
+  /* ── Semantic — success (four roles + tint alias) ── */
+  --color-success: var(--color-emerald-600);        /* solid: dot, badge, active */
+  --color-success-fg: var(--color-emerald-700);     /* text/icon on neutral surface */
+  --color-success-bg-subtle: var(--color-emerald-50); /* tinted container bg */
+  --color-success-border: var(--color-emerald-200); /* tinted container border */
+  --color-success-tint: var(--color-success-bg-subtle);
+
+  /* ── Semantic — danger ── */
+  --color-danger: var(--color-red-600);
+  --color-danger-fg: var(--color-red-700);
+  --color-danger-bg-subtle: var(--color-red-50);
+  --color-danger-border: var(--color-red-200);
+  --color-danger-tint: var(--color-danger-bg-subtle);
+
+  /* ── Semantic — warning (dark text on amber fill via -on-solid) ── */
+  --color-warning: var(--color-amber-500);
+  --color-warning-fg: var(--color-amber-700);       /* warning text on neutral surface */
+  --color-warning-bg-subtle: var(--color-amber-50);
+  --color-warning-border: var(--color-amber-200);
+  --color-warning-tint: var(--color-warning-bg-subtle);
+  --color-warning-on-solid: var(--color-slate-900); /* text ON an amber fill — never white (§8.1) */
+
+  /* ── Semantic — info ── */
+  --color-info: var(--color-sky-600);
+  --color-info-fg: var(--color-sky-700);
+  --color-info-bg-subtle: var(--color-sky-50);
+  --color-info-border: var(--color-sky-200);
+  --color-info-tint: var(--color-info-bg-subtle);
+
+  /* ── Surfaces & text (light defaults) ── */
+  --color-canvas: var(--color-slate-50);
+  --color-surface: var(--color-white);
+  --color-surface-subtle: var(--color-slate-100);
+  --color-border: var(--color-slate-200);
+  --color-border-strong: var(--color-slate-300);
+  --color-fg: var(--color-slate-900);
+  --color-fg-muted: var(--color-slate-600);
+  --color-fg-subtle: var(--color-slate-400);
+  --color-icon: var(--color-slate-500);
+
+  /* backdrop / scrim */
+  --color-scrim: color-mix(in oklch, var(--color-slate-950) 50%, transparent);
+}
+
+/* ── Dark theme — re-point surface/text/semantic tokens (v2 §3.4 / §7) ── */
+.dark {
+  --color-canvas: var(--color-slate-950);
+  --color-surface: var(--color-slate-900);
+  --color-surface-subtle: var(--color-slate-800);
+  --color-border: var(--color-slate-800);
+  --color-border-strong: var(--color-slate-700);
+  --color-fg: var(--color-slate-50);
+  --color-fg-muted: var(--color-slate-400);
+  --color-fg-subtle: var(--color-slate-500);
+  --color-icon: var(--color-slate-400);
+
+  --color-primary: var(--color-indigo-500);
+  --color-primary-hover: var(--color-indigo-400);
+  --color-primary-active: var(--color-indigo-600);
+  --color-primary-tint: var(--color-indigo-950);
+  --color-primary-tint-fg: var(--color-indigo-300);
+  --color-ring: var(--color-indigo-400);
+
+  --color-success: var(--color-emerald-500);
+  --color-success-fg: var(--color-emerald-300);
+  --color-success-bg-subtle: var(--color-emerald-950);
+  --color-success-border: var(--color-emerald-800);
+  --color-success-tint: var(--color-success-bg-subtle);
+
+  --color-danger: var(--color-red-500);
+  --color-danger-fg: var(--color-red-300);
+  --color-danger-bg-subtle: var(--color-red-950);
+  --color-danger-border: var(--color-red-800);
+  --color-danger-tint: var(--color-danger-bg-subtle);
+
+  --color-warning: var(--color-amber-400);
+  --color-warning-fg: var(--color-amber-300);
+  --color-warning-bg-subtle: var(--color-amber-950);
+  --color-warning-border: var(--color-amber-800);
+  --color-warning-tint: var(--color-warning-bg-subtle);
+  --color-warning-on-solid: var(--color-slate-900); /* amber-400 fill still wants dark text */
+
+  --color-info: var(--color-sky-500);
+  --color-info-fg: var(--color-sky-300);
+  --color-info-bg-subtle: var(--color-sky-950);
+  --color-info-border: var(--color-sky-800);
+  --color-info-tint: var(--color-info-bg-subtle);
+
+  --color-accent: var(--color-sky-500);
+}

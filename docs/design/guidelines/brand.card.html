@@ -1,0 +1,31 @@
+<!-- @dsCard group="Brand" viewport="700x180" name="Wordmark & voice" subtitle="No logo supplied — plain-type wordmark; plain, confident copy" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body{margin:0;padding:24px;background:var(--color-surface);font-family:var(--font-sans);color:var(--color-fg);display:flex;gap:28px;align-items:center}
+  .mark{font-size:40px;font-weight:600;letter-spacing:-.03em}
+  .mark b{color:var(--color-primary)}
+  .dark-chip{background:var(--color-slate-950);border-radius:var(--radius-lg);padding:18px 22px}
+  .dark-chip .mark{color:#fff}
+  .voice{border-left:1px solid var(--color-border);padding-left:24px;flex:1}
+  .voice .good{color:var(--color-success);font-weight:500}.voice .bad{color:var(--color-danger);font-weight:500;text-decoration:line-through}
+  .voice p{margin:0 0 8px;font-size:13px}
+  .voice small{font-size:11px;color:var(--color-fg-muted)}
+</style>
+</head>
+<body>
+<div style="display:flex;flex-direction:column;gap:14px">
+  <div class="mark">Click<b>Scope</b></div>
+  <div class="dark-chip"><div class="mark">Click<b style="color:var(--color-indigo-400)">Scope</b></div></div>
+</div>
+<div class="voice">
+  <p><span class="good">Create link</span> &nbsp; <span class="bad">Create Your Link! 🎉</span></p>
+  <p><span class="good">Incorrect password</span> &nbsp; <span class="bad">Oops, that didn't work!</span></p>
+  <p><span class="good">This link is expired</span> &nbsp; <span class="bad">Uh oh…</span></p>
+  <small>Plain, confident, sentence case. No emoji, no exclamation cheer. Errors state the problem and the fix.</small>
+</div>
+</body>
+</html>

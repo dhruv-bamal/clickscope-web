@@ -1,0 +1,59 @@
+// Ported from docs/design/_adherence.oxlintrc.json. Run with
+// `npx oxlint --import-plugin` — no-restricted-imports lives in the "import"
+// plugin, which oxlint only activates when that flag is passed (declaring
+// "import" under `plugins` above isn't enough on its own). See Notes.md,
+// "What the bundle gave and didn't give," for the full reasoning behind what
+// changed on the way in:
+//
+// 1. no-restricted-imports' `group` glob updated from the source bundle's
+//    "components/<folder>/**" (a docs/design-relative path) to
+//    "@/components/design-system/*/**" (this project's real import alias) —
+//    the original glob would never have matched anything real code actually
+//    imports. Verified live: a deliberate violating import correctly warns
+//    under this config.
+// 2. The index-file override glob updated from "**/index.js" to
+//    "**/design-system/index.ts" to match the real barrel file, and scoped to
+//    the design-system folder specifically (src/components/patterns has no
+//    such barrel/exemption).
+// 3. Dropped entirely: the source config's `no-restricted-syntax` rule — both
+//    its 41 per-component "doesn't accept that prop" selectors and the 3
+//    raw-hex/px/font-family bans, plus the "x-omelette" metadata block that
+//    generated the former. oxlint 1.79 (the version this project installs)
+//    does not implement no-restricted-syntax at all: `oxlint -c
+//    _adherence.oxlintrc.json` fails outright with "Rule 'no-restricted-syntax'
+//    not found in plugin 'eslint'" — the source bundle's config was written
+//    against ESLint's rule catalog, not oxlint's actual (smaller, Rust-native)
+//    one, so this half of it was never actually runnable. Separately, even if
+//    it were supported, the 41 prop-contract selectors would have been
+//    redundant with TypeScript now that every component is a real .tsx file
+//    with a real interface (Badge's `status` literal union already rejects a
+//    bogus value at compile time) — and actively wrong for the six components
+//    that spread `{...rest}` onto a native element and extend React's own
+//    *HTMLAttributes<...> (Button, IconButton, Input, Textarea, Select,
+//    Checkbox): the generated allowlist only included each component's own
+//    custom props, so it would have flagged ordinary correct usage like
+//    `<Input type="email" value={x} onChange={...} />` as a violation.
+{
+  "plugins": ["react", "import"],
+  "rules": {
+    "no-restricted-imports": [
+      "warn",
+      {
+        "patterns": [
+          {
+            "group": ["@/components/design-system/*/**"],
+            "message": "Import design-system components from '@/components/design-system' (the barrel), not component internals."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["**/design-system/index.ts"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
+}

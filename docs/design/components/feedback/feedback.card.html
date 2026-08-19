@@ -1,0 +1,85 @@
+<!-- @dsCard group="Components" viewport="700x760" name="Feedback & overlays" subtitle="Toast, menu, alert, QR, empty state, page errors, loading" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body{margin:0;padding:24px;background:var(--color-canvas);font-family:var(--font-sans);color:var(--color-fg)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  .eyebrow{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-fg-muted);margin-bottom:10px}
+  .skel{display:flex;flex-direction:column;gap:8px}
+  .row{display:flex;gap:16px;align-items:center}
+  .full{grid-column:1 / -1}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const NS = window.ClickScopeDesignSystem_0a7fd7;
+const { Toast, DropdownMenu, EmptyState, Spinner, Skeleton, Button, QrCodePopover, PageError } = NS;
+function Demo(){
+  return (
+    <div className="grid">
+      <div className="skel" style={{gap:12}}>
+        <div className="eyebrow">Toasts</div>
+        <Toast variant="success" title="Link created" detail="short.link/launch is live" onDismiss={()=>{}} />
+        <Toast variant="danger" title="Couldn't shorten URL" detail="That destination isn't reachable" onDismiss={()=>{}} />
+      </div>
+      <div>
+        <div className="eyebrow">Dropdown menu</div>
+        <DropdownMenu items={[
+          { icon:"pencil", label:"Edit" },
+          { icon:"qr-code", label:"QR code" },
+          { icon:"copy", label:"Copy link", hint:"⌘C" },
+          { divider:true },
+          { icon:"trash-2", label:"Delete", danger:true },
+        ]} />
+      </div>
+      <div>
+        <div className="eyebrow">Loading</div>
+        <div className="row" style={{marginBottom:14}}>
+          <Spinner size={16} /><Spinner size={20} /><span style={{color:"var(--color-fg-muted)",fontSize:13}}>Checking alias…</span>
+        </div>
+        <div className="skel">
+          <Skeleton width={140} height={24} />
+          <Skeleton height={12} /><Skeleton width="80%" height={12} />
+        </div>
+      </div>
+      <div style={{border:"1px solid var(--color-border)",borderRadius:"var(--radius-lg)",background:"var(--color-surface)"}}>
+        <EmptyState icon="link-2" title="Create your first link" description="Paste a long URL to get a short, shareable link." action={<Button variant="primary" icon="plus">Create link</Button>} />
+      </div>
+      <div className="full">
+        <div className="eyebrow">Inline alert (§9.9) &amp; QR popover (§9.13)</div>
+        <div style={{display:"flex",gap:16,alignItems:"flex-start"}}>
+          <div style={{flex:1,display:"flex",flexDirection:"column",gap:10}}>
+            <div className="cs-alert cs-alert--danger"><div className="cs-alert__body"><div className="cs-alert__title">Couldn't save changes</div><div className="cs-alert__detail">Check the highlighted fields and try again.</div></div></div>
+            <div className="cs-alert cs-alert--info"><div className="cs-alert__body"><div className="cs-alert__title">This link is password protected</div></div></div>
+          </div>
+          <div style={{border:"1px solid var(--color-border)",borderRadius:"var(--radius-lg)",background:"var(--color-surface)",padding:16}}>
+            <QrCodePopover shortUrl="short.link/launch" onDownload={()=>{}} onCopy={()=>{}} />
+          </div>
+        </div>
+      </div>
+      <div className="full">
+        <div className="eyebrow">Page errors — 401 / 403 / 404 (§9.15)</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+          {[401,403,404].map(code => (
+            <div key={code} style={{border:"1px solid var(--color-border)",borderRadius:"var(--radius-lg)",background:"var(--color-surface)"}}>
+              <PageError code={code} action={<Button variant={code===401?"primary":"secondary"} size="sm">{code===401?"Sign in":"Back"}</Button>} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo/>);
+</script>
+</body>
+</html>

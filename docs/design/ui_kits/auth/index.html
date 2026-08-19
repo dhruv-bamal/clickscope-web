@@ -1,0 +1,24 @@
+<!-- @dsCard group="Auth" viewport="960x680" name="Auth flow" subtitle="Sign in, forgot / reset password, account-link conflict" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Click Scope — Auth</title>
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>html,body,#root{height:100%}body{margin:0}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="../app/Overlays.jsx"></script>
+<script type="text/babel" src="AuthScreens.jsx"></script>
+<script type="text/babel">
+ReactDOM.createRoot(document.getElementById("root")).render(<AuthFlow />);
+</script>
+</body>
+</html>

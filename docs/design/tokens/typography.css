@@ -1,0 +1,40 @@
+/* Click Scope — typography tokens (Section 4).
+   Two families only: Geist Sans (UI) + Geist Mono (machine text). No serif/display.
+   Sizes mirror Tailwind's text-* steps (rem) with line-height baked in.
+   text-sm is the PRODUCT DEFAULT; text-base is reserved for marketing/long-form. */
+
+:root {
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, "JetBrains Mono", monospace;
+
+  /* Size / line-height pairs (Tailwind text-* steps) */
+  --text-xs: 0.75rem;
+  --text-xs--lh: 1rem;
+  --text-sm: 0.875rem;
+  --text-sm--lh: 1.5rem; /* leading-6 — the product body default */
+  --text-base: 1rem;
+  --text-base--lh: 1.75rem; /* leading-7 — marketing body */
+  --text-lg: 1.125rem;
+  --text-lg--lh: 1.75rem;
+  --text-xl: 1.25rem;
+  --text-xl--lh: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--lh: 2rem;
+  --text-3xl: 1.875rem;
+  --text-3xl--lh: 2.25rem;
+  --text-4xl: 2.25rem;
+  --text-4xl--lh: 2.5rem;
+  --text-5xl: 3rem;
+  --text-6xl: 3.75rem;
+
+  /* Weights */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Tracking */
+  --tracking-tight: -0.025em; /* headings */
+  --tracking-normal: 0em;     /* body */
+  --tracking-wide: 0.025em;   /* overline / eyebrow */
+}

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  html,body{margin:0;height:100%}
+  .tile{display:flex;width:1280px;height:854px;font-family:var(--font-sans)}
+  .main{flex:1;display:flex;align-items:center;justify-content:center;background:var(--color-indigo-600)}
+  .mark{font-size:150px;font-weight:600;letter-spacing:-0.03em;color:#fff;line-height:1}
+  .mark b{font-weight:600;color:var(--color-indigo-200)}
+  .strip{display:flex;flex-direction:column;width:150px}
+  .strip span{flex:1}
+</style>
+</head>
+<body>
+<div class="tile">
+  <div class="main"><div class="mark">Click<b>Scope</b></div></div>
+  <div class="strip">
+    <span style="background:var(--color-amber-400)"></span>
+    <span style="background:var(--color-sky-500)"></span>
+    <span style="background:var(--color-emerald-600)"></span>
+    <span style="background:var(--color-red-600)"></span>
+  </div>
+</div>
+</body>
+</html>

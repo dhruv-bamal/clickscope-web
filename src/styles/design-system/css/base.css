@@ -1,0 +1,77 @@
+/* Click Scope — base / reset. Applied globally by consumers linking styles.css. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  font-feature-settings: normal;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--lh);
+  color: var(--color-fg);
+  background: var(--color-canvas);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Machine text — URLs, short-codes, aliases, QR payloads, numeric IDs */
+code,
+kbd,
+samp,
+pre,
+.cs-mono {
+  font-family: var(--font-mono);
+}
+
+/* Tabular numerals for metrics / aligned columns */
+.cs-tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Links resolve through the single action color */
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* Headings inherit the sans family, tight tracking */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-fg);
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Canonical focus ring (v2 §8.2) — focus-visible only, indigo everywhere.
+   Offset color matches the immediate background: default to --color-surface
+   (most controls sit on cards/surfaces); a control placed directly on the page
+   background sets --focus-offset: var(--color-canvas) on itself or an ancestor. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-offset, var(--color-surface)), 0 0 0 4px var(--color-ring);
+  border-radius: var(--radius-md);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

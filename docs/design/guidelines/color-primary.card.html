@@ -1,0 +1,30 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Primary — Indigo" subtitle="The single action color: act here / live / selected" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body{margin:0;padding:20px;background:var(--color-surface);font-family:var(--font-sans)}
+  .row{display:flex;gap:0;border-radius:var(--radius-md);overflow:hidden}
+  .sw{flex:1;height:88px;display:flex;flex-direction:column;justify-content:flex-end;padding:8px;box-sizing:border-box}
+  .sw b{font-size:11px;font-weight:600}
+  .sw small{font-family:var(--font-mono);font-size:9px;opacity:.85}
+  .lite{color:var(--color-slate-900)}.dk{color:#fff}
+  .cap{margin-top:10px;font-size:11px;color:var(--color-fg-muted)}
+  .cap code{font-family:var(--font-mono);color:var(--color-primary)}
+</style>
+</head>
+<body>
+<div class="row">
+  <div class="sw lite" style="background:var(--color-indigo-50)"><b>50</b><small>tint</small></div>
+  <div class="sw lite" style="background:var(--color-indigo-200)"><b>200</b></div>
+  <div class="sw dk" style="background:var(--color-indigo-500)"><b>500</b><small>ring</small></div>
+  <div class="sw dk" style="background:var(--color-indigo-600)"><b>600</b><small>primary</small></div>
+  <div class="sw dk" style="background:var(--color-indigo-700)"><b>700</b><small>hover</small></div>
+  <div class="sw dk" style="background:var(--color-indigo-800)"><b>800</b><small>active</small></div>
+  <div class="sw dk" style="background:var(--color-indigo-950)"><b>950</b><small>dark tint</small></div>
+</div>
+<div class="cap">Rare by design — <code>--color-primary</code> is the only fill that means "act here". Never a second button color.</div>
+</body>
+</html>

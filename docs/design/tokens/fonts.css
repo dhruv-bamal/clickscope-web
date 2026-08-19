@@ -1,0 +1,5 @@
+/* Click Scope — webfonts.
+   Geist Sans (UI) + Geist Mono (machine text: URLs, codes, aliases, QR data).
+   Both are shipped via Google Fonts CDN; the @font-face rules below are pulled in
+   through this @import so the compiler resolves the same faces consumers load. */
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap");

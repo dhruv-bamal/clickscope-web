@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="App dashboard" description="Click Scope authenticated dashboard — KPI stat cards, clicks-over-time chart, top links" -->
+<helmet>
+<script src="./ds-base.js"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script src="../../ui_kits/app/data.js"></script>
+</helmet>
+<div style="max-width:80rem;margin:0 auto;padding:28px 32px;background:var(--color-canvas);color:var(--color-fg);font-family:var(--font-sans);min-height:100%">
+<x-import component="DashboardScreen" from="../../ui_kits/app/DashboardScreen.jsx" hint-size="100%,900px"></x-import>
+</div>
+</x-dc>
+</body>
+</html>

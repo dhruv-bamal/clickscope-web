@@ -1,0 +1,31 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Neutral — Slate" subtitle="The workhorse: canvas, surfaces, borders, text, icons" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body{margin:0;padding:20px;background:var(--color-surface);font-family:var(--font-sans)}
+  .row{display:flex;gap:0;border:1px solid var(--color-border);border-radius:var(--radius-md);overflow:hidden}
+  .sw{flex:1;height:88px;display:flex;flex-direction:column;justify-content:flex-end;padding:8px;box-sizing:border-box}
+  .sw b{font-size:11px;font-weight:600}
+  .sw small{font-family:var(--font-mono);font-size:9px;opacity:.85}
+  .lite{color:var(--color-slate-900)}.dk{color:#fff}
+  .cap{margin-top:10px;font-size:11px;color:var(--color-fg-muted)}
+</style>
+</head>
+<body>
+<div class="row">
+  <div class="sw lite" style="background:var(--color-slate-50)"><b>50</b><small>canvas</small></div>
+  <div class="sw lite" style="background:var(--color-slate-100)"><b>100</b><small>subtle</small></div>
+  <div class="sw lite" style="background:var(--color-slate-200)"><b>200</b><small>border</small></div>
+  <div class="sw lite" style="background:var(--color-slate-300)"><b>300</b><small>strong</small></div>
+  <div class="sw lite" style="background:var(--color-slate-400)"><b>400</b><small>subtle fg</small></div>
+  <div class="sw dk" style="background:var(--color-slate-500)"><b>500</b><small>icon</small></div>
+  <div class="sw dk" style="background:var(--color-slate-600)"><b>600</b><small>muted fg</small></div>
+  <div class="sw dk" style="background:var(--color-slate-900)"><b>900</b><small>fg / surf</small></div>
+  <div class="sw dk" style="background:var(--color-slate-950)"><b>950</b><small>dark canvas</small></div>
+</div>
+<div class="cap">Cool gray — the vast majority of every screen. Structure comes from borders + subtle surface shifts, not shadow.</div>
+</body>
+</html>
