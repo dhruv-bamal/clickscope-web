@@ -91,3 +91,191 @@
 **Production considerations.** None of this phase's four new patterns (`SignupForm`, `DeleteConfirmModal`, `EditLinkModal`, `Pagination`) or the QR/oxlint fixes required inventing new visual language — every one of them composes existing tokens and existing components, or (for oxlint) removes rules that can't run rather than replacing them with something new. That constraint held throughout specifically so 12b's API-wiring work inherits a design surface with zero pending "which one is real" ambiguity.
 
 **Interview answer.** The bundle is genuinely complete for what it set out to model — tokens, 24 components, four reference screens — but "complete" has a boundary, and this phase's job was finding it precisely rather than assuming it. Concretely: no npm dependencies at all (Icon's CDN dependency was the big one), no pagination, no signup screen, no max-clicks input despite the API supporting the field, a QR code that explicitly isn't scannable, a `Tag` component built for a field the API schema doesn't have, and an adherence lint config written against a rule (`no-restricted-syntax`) the actual installed linter doesn't implement. Every gap got a specific fix traced to a specific file, and every new piece reused existing components and tokens rather than inventing new ones — the four new patterns and the QR/oxlint fixes are compositions of what already existed, not new design decisions.
+
+---
+
+## Phase 12b: API Integration
+
+### The one API client, and the typed error it never lets you skip
+
+**What it is.** `src/lib/api.ts` is the only file in the project that reads `NEXT_PUBLIC_API_URL` or constructs a request to `clickscope-api`. Every call — `signup`, `login`, `getMe`, `createLink`, `listLinks`, `getLink`, `getLinkStats`, `updateLink`, `deleteLink` — funnels through one internal `request<T>()` that attaches `Authorization: Bearer <token>` when a token is passed, and throws a typed `ApiError` (carrying `status`, `code`, `requestId`, `details`, and — only on a 429 — `retryAfterSeconds`) on any non-2xx response.
+
+**Why it exists in this project.** Without a single choke point, every call site would independently decide how to build the URL, whether to attach the header, and how to parse `{ error: { code, message, requestId } }` — and the header-attachment step is exactly the kind of thing that's trivial to forget once in fifteen call sites and then spend an hour debugging a 401 that only reproduces on one screen.
+
+**How it works mechanically.** Two response shapes need special-casing before the generic JSON path runs. First, `DELETE /api/links/:id` returns `204 No Content` — calling `.json()` on an empty body throws a `SyntaxError` ("Unexpected end of JSON input"), not a usable error, so `request<T>()` checks `res.status === 204` and returns `undefined as T` before ever calling `.json()`. Second, a `429` gets its own branch: the retry delay can come from the body's `details.retryAfterSeconds` or the `Retry-After` header, and `ApiError.retryAfterSeconds` normalizes both into one field so a caller never re-parses either.
+
+**Where it lives in the codebase.** `src/lib/api.ts` (the client and `ApiError` class), `src/types/api.ts` (every request/response/error shape it's typed against), every call site in `src/context/AuthContext.tsx`, `src/components/patterns/{LoginForm,SignupForm,CreateLinkModal}.tsx`, and `src/app/dashboard/DashboardInteractive.tsx`.
+
+**Common pitfalls.** Calling `.json()` unconditionally on a `DELETE` response — this genuinely would have broken the delete flow's happy path, not just its error path, since a 204's body is empty by definition, not malformed JSON.
+
+**Interview answer.** One file owns the base URL, the auth header, and error parsing, so every one of the nine API calls in this app behaves identically on the two failure modes that are easy to get wrong per-call-site: a 204 with no body, and a 429 whose retry delay can live in two different places (a header or the body). Centralizing it means those two edge cases get handled once, correctly, instead of being re-discovered (or missed) at each call site.
+
+---
+
+### `NEXT_PUBLIC_` is a security boundary, not a naming convention
+
+**What it is.** Next.js inlines any env var prefixed `NEXT_PUBLIC_` into the client JavaScript bundle at build time — it becomes a literal string baked into shipped code, readable by anyone who views source. An *un*-prefixed var is only available in Server Components, Route Handlers, and other server-only code; reading it from a Client Component doesn't fail to build — it silently returns `undefined` at runtime.
+
+**Why it exists in this project.** `NEXT_PUBLIC_API_URL` genuinely has no secret in it — it's a base URL, not a credential — so exposing it to the browser is correct. But the prefix isn't decorative: it's the literal mechanism that makes the value reach `src/lib/api.ts`, which runs entirely client-side (see the "server vs. client fetching" entry below). Get the prefix wrong — omit it, or typo it — and the failure mode isn't a build error. `BASE_URL` becomes `undefined`, `fetch(\`${undefined}/api/...\`)` resolves to a relative URL like `/api/auth/login` evaluated against the Next.js dev server's own origin, and that 404s against Next's own (nonexistent) route instead of clickscope-api — a confusing "why is my JSON API returning an HTML 404 page" bug, not a clear "env var missing" one. `src/lib/api.ts` `console.error`s loudly in the browser if `BASE_URL` is falsy specifically to shortcut that debugging session.
+
+**Where it lives in the codebase.** `.env.local.example` (the var itself, with this reasoning in a comment), `src/lib/api.ts`'s `BASE_URL` constant and its guard.
+
+**Common pitfalls.** Assuming an unprefixed var "just doesn't get inlined" the way a bundler's dead-code elimination silently drops something — it's not dropped, it's a real runtime `undefined`, which is worse: no build warning, no obvious signal, just a value that looks present in `.env.local` but was never actually delivered to the code reading it.
+
+**Interview answer.** `NEXT_PUBLIC_` isn't a style convention, it's the actual boundary between "safe to expose to a browser" and "server secret" — Next.js literally inlines prefixed vars into the client bundle at build time and leaves unprefixed ones server-only. Using it correctly here is easy (the API base URL has no secret in it), but the failure mode if you forget it is worth knowing: no build error, just `undefined` silently reaching a client component, turning into a relative-URL fetch against the wrong origin, and 404ing in a way that looks like a backend problem instead of a config one.
+
+---
+
+### The provider pattern: `providers.tsx` between a Server `layout.tsx` and `AuthContext`
+
+**What it is.** `src/context/AuthContext.tsx` is a `"use client"` file exporting `AuthProvider` and a `useAuth()` hook. `src/app/providers.tsx` is a thin `"use client"` wrapper — today just `<AuthProvider>{children}</AuthProvider>` — imported into `src/app/layout.tsx`, which itself carries no `"use client"` directive and stays a Server Component.
+
+**Why it exists in this project.** React context has no representation in the RSC payload — it's a runtime mechanism tied to a component tree that hydrates in the browser, so `createContext`/`useContext` simply cannot run in a Server Component. That forces `AuthProvider` itself to be client-side. The interesting decision is where the `"use client"` boundary starts: not on `layout.tsx` directly, but on a separate `providers.tsx` file that `layout.tsx` imports and renders as a child. This is the same downward-only boundary rule 12a's Icon section already established (`"use client" is a boundary, not a file marker`) — a Server Component can render a Client Component as a child without becoming one itself.
+
+**How it works mechanically.** If `"use client"` were put directly on `layout.tsx` instead, every route in the app would be pulled inside that boundary — including `/design-system`, which 12a's Notes.md already documents as deliberately kept server-rendered specifically so `QrCodePopover` (an `async function` Server Component) can be rendered directly from `page.tsx`. `QrCodePopover` cannot be rendered from inside a `"use client"` ancestor at all — React throws "Only Server Components can be async" at runtime, the exact bug 12a already hit and documented, caught only by opening the page in a browser, not by `npm run build`/`npm run lint`. A `"use client"` root layout wouldn't just cost bundle size across the whole app — it would break `/design-system` outright, the same class of failure 12a already diagnosed once at smaller scale. Keeping `layout.tsx` a Server Component and pushing `"use client"` down into `providers.tsx` is what keeps that page working at all in this phase. (Confirmed, not just reasoned about: `npm run build` after wiring this up prerendered `/design-system` as static alongside every new route — see "production considerations" below.)
+
+**Where it lives in the codebase.** `src/context/AuthContext.tsx`, `src/app/providers.tsx`, `src/app/layout.tsx` (the two-line edit: import `Providers`, wrap `{children}`).
+
+**Common pitfalls.** Importing `AuthProvider` directly into `layout.tsx` and marking `layout.tsx` itself `"use client"` "since it needs the provider anyway" — the thin wrapper file is what avoids that; it's boilerplate today (one provider, no logic of its own) but it's the only thing standing between a two-line layout change and a whole-app client boundary.
+
+**Production considerations.** 12a's own Notes.md already states the rule this phase leans on: "worth running `npm run build` after any component-library change, not just `npm run dev`, since dev mode is more forgiving about some boundary violations that only surface under production compilation." This phase followed that explicitly — `npm run build` was run (not just `next dev`) after wiring `providers.tsx`/`AuthContext`/`DashboardInteractive`/`LoginForm`/`CreateLinkModal`, and it's what actually confirms the boundaries are correct, not just that the dev server didn't complain.
+
+**Interview answer.** Context can't exist in a Server Component, so `AuthProvider` has to be `"use client"` — but *where* that boundary starts matters. Putting it on a separate `providers.tsx` file, imported into a `layout.tsx` that stays a Server Component, means only that one small file and its subtree go client-side, not the entire app. Get this wrong — mark `layout.tsx` itself client — and you don't just ship more JavaScript than necessary, you break `/design-system`, which depends on `layout.tsx`'s children staying server-renderable so an async Server Component further down the tree can exist at all.
+
+---
+
+### The OAuth fragment redirect, and why `AuthContext` catches it instead of a route
+
+**What it is.** `clickscope-api`'s `GET /api/auth/google/callback` finishes the OAuth exchange server-side and redirects the browser to `` `${FRONTEND_URL}#token=${token}` `` on success, or `` `${FRONTEND_URL}?error=oauth_denied` `` if the user denies consent. `AuthContext`'s mount-time effect checks `window.location.hash` for `#token=`, and if present, stores the token and calls `window.history.replaceState(null, "", pathname + search)` to remove it from the URL immediately.
+
+**Why it exists in this project.** The token goes in the URL **fragment**, not a query parameter, because a fragment is never sent by the browser to any server — not clickscope-api, not a CDN, not a proxy in between — so it can't leak into access logs or a `Referer` header the way a query string would. The frontend has to read it from `window.location.hash` specifically because that's the one place a fragment is visible: client-side JavaScript, after the redirect has already landed.
+
+**How it works mechanically.** `clickscope-api`'s `.env` has `FRONTEND_URL=http://localhost:5173` with **no path segment** — confirmed by reading the config directly, not assumed. That means the redirect always lands the browser at the frontend's root (`/`), whichever page that resolves to, regardless of which page the user started the OAuth flow from. Since clickscope-api can't be modified to redirect anywhere else, a dedicated `/auth/callback` route would simply never be hit by this redirect. `AuthProvider` is the only piece of frontend code guaranteed to mount on every route including root — so it's the only place that can reliably catch the fragment, and that's why the check lives in `AuthContext.tsx`'s mount effect rather than a page component.
+
+**Common pitfalls.** Assuming "the fragment never reaches a server" means scrubbing it is optional — it isn't. The fragment is still visible in the browser's own history (a forward/back navigation replays it), in a screen share, and to any other script already running on the page via `location.href`; `history.replaceState` removes it from the current entry without adding a new one, a navigation, or a reload, closing all three of those residual exposures even though none of them involve a server at all.
+
+**Where it lives in the codebase.** `src/context/AuthContext.tsx`'s first `useEffect` (the fragment-then-localStorage restore); `clickscope-api/src/routes/auth.ts`'s `/google/callback` handler (the redirect this responds to, confirmed by reading it directly — do not modify this file, it's out of scope for clickscope-web).
+
+**Interview answer.** clickscope-api puts the OAuth token in a URL fragment specifically because fragments never reach a server, closing off access-log and Referer-header leakage. The frontend reads it from `window.location.hash`. The twist in this app: the API's `FRONTEND_URL` has no path, so the redirect always lands at the root, no matter which page the user started from — which means a dedicated callback route would never actually be hit, and the fragment check has to live somewhere guaranteed to mount on every route: the auth provider itself. And scrubbing the fragment with `history.replaceState` still matters afterward even though it never touched a server, because it's still sitting in browser history and readable by any other script on the page until it's removed.
+
+---
+
+### The localStorage XSS tradeoff, as a deliberate Phase 0 decision
+
+**What it is.** The JWT issued by `/signup`, `/login`, and the OAuth callback is stored in `localStorage` (`src/context/AuthContext.tsx`), not an `httpOnly` cookie.
+
+**Why it exists in this project.** `localStorage` is readable by any script that executes in the page's origin — a compromised dependency, a reflected XSS bug anywhere in the app — in a way an `httpOnly` cookie categorically is not, since JavaScript can't read those at all. This project accepts that tradeoff because there was no alternative available given two facts confirmed directly from clickscope-api's source: every token-bearing response (`/signup`, `/login`, the OAuth redirect) puts the token in a JSON body or a URL fragment, never a `Set-Cookie` header, and clickscope-api can't be modified to add one (out of scope for this phase). Given that starting point, `localStorage` is the only storage a `fetch().then()` handler and a `window.location.hash` read can both populate from client-side code.
+
+**Where it lives in the codebase.** `src/context/AuthContext.tsx` (`localStorage.setItem`/`getItem`/`removeItem` calls).
+
+**Interview answer.** The token lives in `localStorage` instead of an `httpOnly` cookie, which trades away some XSS resistance for something clickscope-api simply doesn't offer: every token-bearing response is a JSON body or a fragment, never a `Set-Cookie` header. Given that the API can't be changed in this phase, `localStorage` is the only storage both a `fetch` response handler and a fragment read can populate — an `httpOnly` cookie would need the API to set it, which isn't on the table here.
+
+---
+
+### Client-side route guards are UX, not security
+
+**What it is.** `DashboardInteractive` redirects to `/login` when `!isLoading && !token`; `LoginForm` and `SignupForm` redirect to `/dashboard` when a session is already restored. All three checks live entirely in client-side React state.
+
+**Why it exists in this project.** These guards exist purely to avoid flashing a broken or contradictory UI — a logged-out user briefly seeing an empty dashboard shell, or a logged-in user seeing a login form they don't need. They provide zero actual access control: a user with dev tools open can trivially skip past any of them, and the dashboard route would still render its shell underneath.
+
+**How it works mechanically.** The real authorization boundary is entirely on the API side — `clickscope-api`'s `requireAuth` middleware rejects any `/api/links*` request without a valid `Authorization: Bearer` header, independent of anything the frontend renders. If a client-side guard were bypassed or simply absent, the dashboard would render its shell, its data-fetching effect would fire, and `GET /api/links` would 401 — surfaced as this app's own error-toast path, not a security failure, because no real data was ever at risk.
+
+**Where it lives in the codebase.** `src/app/dashboard/DashboardInteractive.tsx`'s first `useEffect` and its `if (!isLoading && !token)` early-return `PageError`; the mirrored checks in `src/components/patterns/LoginForm.tsx` and `SignupForm.tsx`.
+
+**Common pitfalls.** Redirecting on `!token` alone, without gating on `isLoading` — `AuthContext`'s mount-time restore is asynchronous (it has to read `localStorage` or a fragment, then resolve `/me`), so a real logged-in user would see `token === null` for one render before restore finishes, and an ungated guard would bounce them to `/login` on every page load before catching up.
+
+**Interview answer.** These are convenience redirects, not a security layer — real authorization is entirely the API's job, enforced by its `requireAuth` middleware on every links request. The frontend guards exist only so the UI doesn't visibly contradict itself (a dashboard for a logged-out user, a login form for a logged-in one); if you deleted them entirely, the worst that happens is a flash of the wrong screen before a 401 error surfaces, never a data leak.
+
+---
+
+### Why every data-effect is keyed on `[token]`, never `[]`
+
+**What it is.** Every fetch-triggering `useEffect` in this phase — `AuthContext`'s `/me` resolution, `DashboardInteractive`'s link-list fetch, `LinkStatsModal`'s stats fetch — lists `token` (plus any other primitive the fetch depends on, like `offset` or `days`) in its dependency array.
+
+**Why it exists in this project.** The concrete bug an empty array causes: user A logs in, the dashboard's fetch effect runs once with `[]`, and fetches A's links. User A logs out and user B logs in — a different token — in the same tab session, no full page reload. Because the dependency array is `[]`, React never re-runs the effect on its own; nothing about a state change alone re-triggers an effect whose deps say "never re-run." The dashboard keeps rendering user A's stale link list under user B's session until something else forces a refetch. Keying on `[token]` makes the effect re-run the instant `token` changes to B's value, refetching automatically under the new identity — no manual "refresh on login" call needed anywhere.
+
+**How it works mechanically.** React compares each entry in the dependency array between renders using `Object.is` (see the next entry for what goes wrong when an entry isn't a primitive); when any entry differs, the effect's cleanup runs, then the effect body runs again with the new values in its closure.
+
+**Where it lives in the codebase.** `src/context/AuthContext.tsx`'s second `useEffect` (`[token]`), `src/app/dashboard/DashboardInteractive.tsx`'s link-list effect (`[token, offset]`), `src/app/dashboard/DashboardInteractive.tsx`'s `LinkStatsModal`'s effect (`[token, link.id, days]`).
+
+**Interview answer.** An empty dependency array means "run once, on mount, and never again" — which is wrong for anything whose correctness depends on a value that can legitimately change during the component's lifetime, like which user is logged in. Keying the effect on `[token]` means a login, logout, or OAuth capture that changes `token` automatically re-runs the fetch under the new identity; without it, switching accounts in the same tab would silently keep showing the previous user's data until an unrelated re-render happened to also trigger a refetch some other way.
+
+---
+
+### AbortController cleanup and the stale-response race
+
+**What it is.** Every fetch effect in this phase creates an `AbortController`, passes `controller.signal` into the `lib/api.ts` call, and returns `() => controller.abort()` as the effect's cleanup function.
+
+**Why it exists in this project.** Concrete timeline: (t0) the dashboard's fetch effect runs with `offset=0`, firing `listLinks(..., offset: 0)`. (t1) before that resolves, the user clicks Next; `offset` becomes `20`, and because the effect is keyed on `[token, offset]`, React re-runs it — firing a second `listLinks(..., offset: 20)` — and, critically, first calls the *cleanup* from the first effect instance, which aborts the first (offset=0) request. (t2) Without that abort: if the network happens to resolve the first (offset=0) response *after* the second (offset=20) one — a slower connection, a GC pause, anything — its `.then()` would call `setLinks` with page-1 data *after* page-2 data has already rendered, silently reverting the UI to the wrong page with no visible error and no obvious cause to whoever's debugging it later. With the abort in place, the first request's promise rejects with a `DOMException` named `"AbortError"` before it can reach `setLinks` at all, and every `.catch()` in this codebase checks `err.name === "AbortError"` and returns early — treating it as an intentional cancellation, not a failure, so it never sets an error state either.
+
+**Where it lives in the codebase.** Every fetch effect: `src/context/AuthContext.tsx`'s `/me` resolution, `src/app/dashboard/DashboardInteractive.tsx`'s link-list fetch, `src/app/dashboard/DashboardInteractive.tsx`'s `LinkStatsModal`'s stats fetch. `src/lib/api.ts`'s `request<T>()` accepts and forwards `signal` on every exported function specifically so every call site can do this.
+
+**Common pitfalls.** Checking `err instanceof ApiError` before checking `err.name === "AbortError"` — an aborted `fetch()` rejects with a `DOMException`, not an `ApiError`, so an abort check has to come first or it falls through to whatever the generic error path does (in this codebase, that would incorrectly show an error toast for a cancellation the user caused on purpose by clicking Next).
+
+**Interview answer.** Without cleanup, a fast dependency change (clicking Next before the previous page finished loading) can let an older, now-irrelevant request's response arrive *after* a newer one and silently overwrite it — the UI ends up showing stale data with zero error and zero indication anything went wrong. `AbortController` cancels the outdated request when its effect instance's cleanup runs, turning that race into a clean "ignore this, it was superseded" instead of a silent data-correctness bug.
+
+---
+
+### Controlled inputs: what breaks with `value` and no `onChange`
+
+**What it is.** Every text/select/toggle field this phase adds or wires — `LoginForm`'s email/password, `CreateLinkModal`'s every field, `SignupForm`'s newly-added email field — pairs a `value` prop with an `onChange` handler that calls `setState`.
+
+**Why it exists in this project.** 12a's `Input`/`Select`/`Textarea` already require both via their inherited `*HTMLAttributes` types, but that's a type looseness, not an enforcement — React itself only warns, it doesn't error, if you pass `value` without `onChange`. What actually happens: React logs a console warning ("You provided a `value` prop to a form field without an `onChange` handler...") and the field becomes read-only from the user's perspective — every keystroke fires a native input event, but since nothing calls `setState`, the component re-renders with the exact same `value` it started with, so nothing the user types ever visibly appears. It looks like a broken, frozen input, not an error.
+
+**Where it lives in the codebase.** Every new/edited field in `src/components/patterns/{LoginForm,SignupForm,CreateLinkModal}.tsx` and `src/app/dashboard/DashboardInteractive.tsx`'s `LinkStatsModal` (`SegmentedControl`'s `value`/`onChange`, non-native but the same pairing requirement).
+
+**Interview answer.** A controlled input's displayed value comes entirely from the `value` prop, not from what the browser's native input element would otherwise track internally — so without an `onChange` that feeds keystrokes back into state, the field is permanently locked to whatever `value` was initially, and every keystroke is silently discarded from the user's point of view. React warns about this in the console, but it's not a build error, so it's the kind of bug that would only get caught by actually typing into the form once.
+
+---
+
+### The Object.is dependency-array trap
+
+**What it is.** React's `useEffect` dependency comparison uses `Object.is` — the same algorithm behind `===`, with two edge-case differences (`NaN` equals `NaN`, `+0` doesn't equal `-0`) that don't matter here. For objects and arrays, that means reference equality: two objects with identical contents are never `Object.is`-equal unless they're the literal same reference.
+
+**Why it exists in this project.** The dashboard's link-list fetch needs both `limit` and `offset` as effect inputs. The naive way to pass them — `useEffect(() => {...}, [{ limit: 20, offset }])` — creates a brand-new object literal on every single render, since `{ limit: 20, offset }` is a fresh allocation every time that line executes, regardless of whether `offset`'s value actually changed. That new object is never `Object.is`-equal to the previous render's object, even when nothing meaningful changed, so the effect would re-run on *every* render — silently defeating the entire purpose of having a dependency array in the first place, and in this specific case, re-firing `listLinks` far more often than the offset actually changes.
+
+**How it works mechanically.** This phase avoids the trap by destructuring primitives directly into the array: `[token, offset]`, never a wrapping object or array. `listLinks(token, { limit: LIMIT, offset }, ...)` still constructs an object, but that object is the function-call argument, not a dependency-array entry — its identity doesn't affect when the effect re-runs, only `token` and `offset`'s primitive values do.
+
+**Where it lives in the codebase.** `src/app/dashboard/DashboardInteractive.tsx`'s link-list effect (`[token, offset]`) and `LinkStatsModal`'s stats effect (`[token, link.id, days]`) — both destructure every dependency into a primitive rather than passing a params object.
+
+**Interview answer.** `useEffect`'s dependency check is reference equality for anything non-primitive, so a freshly-allocated object or array in the dependency array — even one built from values that didn't change — is never equal to last render's version, and the effect re-runs every render regardless. The fix is always the same: pass the primitive values themselves as separate array entries, never a wrapping object literal, so the comparison actually reflects "did the underlying value change" instead of "did I allocate a new object this render," which is true unconditionally.
+
+---
+
+### Server vs. client fetching was forced, not chosen
+
+**What it is.** Every authenticated API call in this app — the dashboard's link list, stats, every mutation — happens inside a `"use client"` component, using `useEffect` and the plain `fetch`-based client in `src/lib/api.ts`.
+
+**Why it exists in this project.** The token lives in `localStorage`. Server Components render on the server, where `window`/`localStorage` don't exist at all — a Server Component has no mechanism to read the token, so it categorically cannot make an authenticated request to clickscope-api on the user's behalf. Given the Phase 0 decision to store the token in `localStorage` rather than an `httpOnly` cookie (see that entry above), there is no server-side alternative available; this isn't a stylistic preference for client-side data fetching, it's the only option the auth storage choice leaves open. If the token instead lived in an `httpOnly` cookie set by clickscope-api on `/login`/`/signup` (which it does not currently do — out of scope to add here), the browser would attach it automatically to same-origin requests, a Next.js Server Component *could* read it via `cookies()` and fetch server-side, and most of `AuthContext`'s client-side restore logic — the mount-time `localStorage` read specifically, though the OAuth fragment capture would likely still need to happen somewhere client-side — would become unnecessary.
+
+**How it works mechanically — and a disagreement worth surfacing, not eliding.** This repo's own bundled Next.js 16.3.1 docs (`node_modules/next/dist/docs/01-app/01-getting-started/06-fetching-data.md` and `01-app/02-guides/single-page-applications.md`) recommend React's `use()` API plus `<Suspense>`, or a library like SWR/React Query, for client-side fetching in Client Components — not raw `useEffect`. This phase uses `useEffect` anyway, deliberately: the goal here was to make the dependency-array/cleanup/stale-response mechanics visible and explainable at each call site, and `use()`+Suspense and SWR/React Query both exist specifically to abstract those mechanics away from the caller. This is a known, intentional departure from the current docs' recommendation, not an oversight — a later phase migrating this fetching layer to SWR or React Query once the teaching goal is no longer the point is a reasonable next step, and it should reuse `src/lib/api.ts`'s functions as the fetcher, since that file's job (base URL, auth header, error parsing) doesn't change regardless of what calls it.
+
+**Where it lives in the codebase.** `src/lib/api.ts` (no `"use client"` itself, but every real caller is client-side), `src/context/AuthContext.tsx`, `src/app/dashboard/DashboardInteractive.tsx`.
+
+**Interview answer.** Client-side fetching wasn't chosen for this app, it was forced by an earlier decision: the JWT lives in `localStorage`, which a Server Component simply cannot read, so no Server Component in this app can attach the auth header a real request needs. If the token lived in an `httpOnly` cookie instead, Server Components could read it via `cookies()` and fetch server-side — but that requires the API to issue the cookie, which clickscope-api doesn't do today. Separately: this repo's own Next.js docs actually recommend `use()`/Suspense or SWR/React Query over raw `useEffect` for client fetching, and this phase uses `useEffect` anyway on purpose, because the point here was making the dependency-array and cleanup mechanics visible rather than abstracting them away — a disagreement with the docs' recommendation, not a mistake.
+
+---
+
+### Surfacing `requestId` through `Toast.detail` without modifying `Toast`
+
+**What it is.** Every mutation's caught `ApiError` renders a `Toast` whose `detail` prop is composed as the error's `message` plus a small muted `ref: {requestId}` line, via `src/app/dashboard/DashboardInteractive.tsx`'s `errorToast()` helper.
+
+**Why it exists in this project.** `Toast` (`src/components/design-system/feedback/Toast.tsx`) has no dedicated `requestId` field — it never needed one before this phase, and adding one would mean editing a 12a design-system primitive for a single call site's need, which the ported design system explicitly wasn't meant to require. `detail` is already typed `React.ReactNode`, though, which means it accepts arbitrary composed content, not just a string — so embedding the requestId as a second line inside `detail` satisfies "surface the API's message and requestId" without touching `Toast.tsx` at all.
+
+**How it works mechanically.** `errorToast()` also branches on `err.code === "TOO_MANY_REQUESTS"` before the generic path, producing a distinct `title: "Slow down"` and a `detail` built from `err.retryAfterSeconds` ("Try again in Ns") — a 429 gets a message about retrying, not the generic requestId-suffixed error text, since a rate limit isn't the kind of failure a requestId helps debug.
+
+**Where it lives in the codebase.** `src/app/dashboard/DashboardInteractive.tsx`'s `errorToast()` function (module-level, shared by the create/edit/delete/list-fetch error paths).
+
+**Interview answer.** Rather than adding a `requestId` prop to `Toast` for one caller's need, the requestId gets composed directly into `detail`, which is already a `ReactNode` and therefore already supports arbitrary content — no design-system file changes required. The requestId matters because it correlates directly to a specific line in clickscope-api's Pino logs, so a user reporting "link creation failed" with that ref string turns a vague bug report into a specific log lookup.
+
+---
+
+### Types hand-written today, generated in Phase 14
+
+**What it is.** `src/types/api.ts` is a hand-written TypeScript file describing every clickscope-api request/response/error shape this app calls, written by reading the API's route and service source directly — the same approach `src/types/link.ts` already used for `Link` in 12a.
+
+**Why it exists in this project.** The two repos share no OpenAPI spec or types package, so nothing in `api.ts` is checked against the actual running API — it only reflects the contract as of whenever someone last read the source. If `clickscope-api`'s `linkService.ts` serializer adds a field next sprint, this file drifts silently: TypeScript has no way to know, because there's nothing connecting the two. Phase 14's planned OpenAPI spec should *generate* this file instead of it being hand-written — a generated client turns the type checker itself into the drift detector (codegen fails or produces a visible diff the moment the two repos disagree) rather than the disagreement only surfacing at runtime as an unexpected 400 or a field that's silently `undefined`.
+
+**Where it lives in the codebase.** `src/types/api.ts` (this phase's new file, following `src/types/link.ts`'s precedent).
+
+**Interview answer.** Hand-writing `src/types/api.ts` was the only option available in this phase — there's no OpenAPI spec yet to generate from — but it's worth naming as a known limitation rather than a permanent choice: nothing here is checked against the live API, so the two repos can silently drift apart, and a generated client (once Phase 14 ships an OpenAPI spec) would turn that silent drift into a build-time failure instead.

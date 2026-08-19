@@ -17,9 +17,13 @@ export interface DeleteConfirmModalProps {
   target: DeleteConfirmTarget;
   onCancel: () => void;
   onConfirm: () => void;
+  /** True while the caller's DELETE request is in flight — disables both
+   * buttons and shows a spinner on Confirm, so a double click can't fire two
+   * requests. */
+  saving?: boolean;
 }
 
-export function DeleteConfirmModal({ open = true, target, onCancel, onConfirm }: DeleteConfirmModalProps) {
+export function DeleteConfirmModal({ open = true, target, onCancel, onConfirm, saving = false }: DeleteConfirmModalProps) {
   const title = target.kind === "single" ? "Delete link?" : `Delete ${target.count} links?`;
   const body =
     target.kind === "single" ? (
@@ -36,10 +40,10 @@ export function DeleteConfirmModal({ open = true, target, onCancel, onConfirm }:
       onClose={onCancel}
       footer={
         <>
-          <Button variant="secondary" onClick={onCancel}>
+          <Button variant="secondary" onClick={onCancel} disabled={saving}>
             Cancel
           </Button>
-          <Button variant="destructive" onClick={onConfirm}>
+          <Button variant="destructive" onClick={onConfirm} loading={saving}>
             {target.kind === "single" ? "Delete link" : "Delete links"}
           </Button>
         </>

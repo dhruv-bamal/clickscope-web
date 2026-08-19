@@ -1,40 +1,23 @@
 "use client";
-// Owns the confirm-password mismatch check the same way the reference
-// ResetPassword screen does (ui_kits/auth/AuthScreens.jsx) — real local form
-// state, not a consequence of anything else in the library.
+// Mirrors SignupForm.tsx's AuthCard layout exactly (icon-in-circle header,
+// OAuth button + divider, cs-card body) — no new layout invented, matching
+// the same convention SignupForm itself was built from. New in 12b: the
+// source bundle never shipped a login screen at all, only the signup one.
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon, Input, Button } from "@/components/design-system";
 import { useAuth } from "@/context/AuthContext";
-import { signup, googleAuthUrl, ApiError } from "@/lib/api";
+import { googleAuthUrl, ApiError } from "@/lib/api";
 
-/**
- * SignupForm — the screen the bundle never shipped. The only pointer to one is
- * a dead stub in the reference SignInScreen ("Create an account", href="#",
- * preventDefault). Built by mirroring that same screen's established layout
- * convention exactly (AuthCard: centered card, icon-in-circle header, OAuth
- * button + divider, cs-card body) rather than inventing new structure.
- *
- * Fields: email + password + confirm password only — clickscope-api's `users`
- * table has no name column (migrations/20260810111606772_create-users-table.ts),
- * so there's nothing to collect beyond credentials. No "Continue with Google"
- * icon: lucide-react dropped its brand icons (Chrome/Google) a while back and
- * the design kit's readme never names a canonical replacement, so the button
- * ships without one rather than inventing a substitute glyph.
- *
- * Wired to POST /api/auth/signup in 12b — see submit() below.
- */
-export function SignupForm() {
-  const { token, isLoading, setToken } = useAuth();
+export function LoginForm() {
+  const { token, isLoading, login } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const mismatch = confirm.length > 0 && password !== confirm;
 
   // Already signed in (e.g. session restored from localStorage) — this is a
   // UX redirect, not a security boundary; see Notes.md.
@@ -47,15 +30,10 @@ export function SignupForm() {
     setSubmitting(true);
     setError(null);
     try {
-      const { token } = await signup({ email, password });
-      setToken(token);
+      await login(email, password);
       router.push("/dashboard");
     } catch (err) {
-      if (err instanceof ApiError && err.code === "CONFLICT") {
-        setError("An account with that email already exists.");
-      } else {
-        setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
-      }
+      setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
     } finally {
       setSubmitting(false);
     }
@@ -91,9 +69,8 @@ export function SignupForm() {
           </span>
           <div style={{ textAlign: "center" }}>
             <h1 style={{ fontSize: "var(--text-2xl)", fontWeight: 600, letterSpacing: "-0.025em" }}>
-              Create your Click<span style={{ color: "var(--color-primary)" }}>Scope</span> account
+              Sign in to Click<span style={{ color: "var(--color-primary)" }}>Scope</span>
             </h1>
-            <p style={{ color: "var(--color-fg-muted)", marginTop: 6 }}>Start shortening, tracking, and protecting your links.</p>
           </div>
         </div>
         <form onSubmit={submit} className="cs-card" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
@@ -112,25 +89,18 @@ export function SignupForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-          <Input label="Password" type="password" help="At least 8 characters." value={password} onChange={(e) => setPassword(e.target.value)} />
-          <Input
-            label="Confirm password"
-            type="password"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            error={mismatch ? "Passwords don't match" : undefined}
-          />
+          <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
           {error && (
             <span className="cs-help cs-help--error">
               <Icon name="circle-alert" size={13} /> {error}
             </span>
           )}
-          <Button type="submit" variant="primary" block loading={submitting} disabled={!email || !password || !confirm || mismatch}>
-            Create account
+          <Button type="submit" variant="primary" block loading={submitting} disabled={!email || !password}>
+            Sign in
           </Button>
         </form>
         <p style={{ textAlign: "center", fontSize: "var(--text-sm)", color: "var(--color-fg-muted)" }}>
-          Already have an account? <Link href="/login">Sign in</Link>
+          Don&apos;t have an account? <Link href="/signup">Create one</Link>
         </p>
       </div>
     </div>

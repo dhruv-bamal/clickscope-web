@@ -5,6 +5,7 @@
 
 import React, { useState } from "react";
 import { Modal, Button, Input, Select, Toggle } from "@/components/design-system";
+import { EXPIRATION_OPTIONS, expirationToIso } from "@/lib/expiration";
 
 export interface EditLinkValues {
   destinationUrl: string;
@@ -21,13 +22,10 @@ export interface EditLinkModalProps {
   initialValues: EditLinkValues;
   onClose: () => void;
   onSave: (values: EditLinkValues) => void;
+  /** True while the caller's PATCH request is in flight — disables the form
+   * and shows a spinner on Save, so a double click can't fire two requests. */
+  saving?: boolean;
 }
-
-const EXPIRATION_OPTIONS = [
-  { value: "never", label: "Never" },
-  { value: "7d", label: "In 7 days" },
-  { value: "30d", label: "In 30 days" },
-];
 
 /**
  * EditLinkModal — a second Modal instance mirroring CreateLinkModal's exact
@@ -45,7 +43,7 @@ const EXPIRATION_OPTIONS = [
  * with `key={shortCode}` so React remounts — and reinitializes — it fresh per
  * link, instead of updating one instance in place.
  */
-export function EditLinkModal({ open = true, shortCode, initialValues, onClose, onSave }: EditLinkModalProps) {
+export function EditLinkModal({ open = true, shortCode, initialValues, onClose, onSave, saving = false }: EditLinkModalProps) {
   const [dest, setDest] = useState(initialValues.destinationUrl);
   const [expiration, setExpiration] = useState(initialValues.expiresAt ? "7d" : "never");
   const [maxClicks, setMaxClicks] = useState(initialValues.maxClicks?.toString() ?? "");
@@ -56,7 +54,10 @@ export function EditLinkModal({ open = true, shortCode, initialValues, onClose, 
   const save = () =>
     onSave({
       destinationUrl: dest,
-      expiresAt: initialValues.expiresAt,
+      // Derived from the `expiration` Select's current state, not
+      // initialValues.expiresAt verbatim — sending the original value back
+      // unconditionally would silently ignore whatever the user just chose.
+      expiresAt: expirationToIso(expiration),
       maxClicks: maxClicks ? Number(maxClicks) : null,
       isPasswordProtected: pw,
     });
@@ -67,10 +68,10 @@ export function EditLinkModal({ open = true, shortCode, initialValues, onClose, 
       onClose={onClose}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button variant="primary" icon="square-pen" onClick={save}>
+          <Button variant="primary" icon="square-pen" onClick={save} loading={saving}>
             Save changes
           </Button>
         </>

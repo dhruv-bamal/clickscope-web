@@ -32,6 +32,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...except committed templates, which are meant to be checked in and copied
+# to a real (gitignored) .env.local — see .env.local.example.
+!.env*.example
 
 # vercel
 .vercel
