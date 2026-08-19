@@ -279,3 +279,113 @@
 **Where it lives in the codebase.** `src/types/api.ts` (this phase's new file, following `src/types/link.ts`'s precedent).
 
 **Interview answer.** Hand-writing `src/types/api.ts` was the only option available in this phase — there's no OpenAPI spec yet to generate from — but it's worth naming as a known limitation rather than a permanent choice: nothing here is checked against the live API, so the two repos can silently drift apart, and a generated client (once Phase 14 ships an OpenAPI spec) would turn that silent drift into a build-time failure instead.
+
+## Phase 13b: Frontend Testing
+
+### RTL's user-facing queries vs. implementation detail
+
+**What it is.** React Testing Library's query priority pushes tests toward `getByRole`, `getByLabelText`, and `getByText` — queries that ask "what would a user, or assistive tech, actually perceive here" — over `container.querySelector(".cs-input")` or reaching into component internals.
+
+**Why it exists in this project.** Every design-system primitive already carries the accessibility wiring this relies on: `Input` (`src/components/design-system/forms/Input.tsx`) associates its `<label>` to the `<input>` via a real `htmlFor`/`id` pair (`useId()`-generated when no `id` prop is passed), `Modal` (`src/components/design-system/feedback/Modal.tsx`) sets `role="dialog"` + `aria-modal="true"` + `aria-label` from its `title`, and `Toast` sets `role="status"`. Querying through those — `getByLabelText("Custom alias")`, `getByRole("dialog").getByRole("button", { name: "Create link" })`, `getByRole("status")` — means a test only breaks when the thing a user would notice actually changes, not when an internal class name or DOM nesting is refactored. The alternative, querying by `cs-*` class names, would tie every test to the exact CSS architecture Phase 12a chose, for zero user-facing benefit.
+
+**How it works mechanically.** Every component test file in this phase (`CreateLinkModal.test.tsx`, `EditLinkModal.test.tsx`, `AuthContext.test.tsx`'s harness, `DashboardInteractive.errorToast.test.tsx`) queries exclusively through `getByLabelText`/`getByRole`/`queryByLabelText` — never a class selector.
+
+**Where it lives in the codebase.** `src/components/patterns/CreateLinkModal.test.tsx`, `src/components/patterns/EditLinkModal.test.tsx`.
+
+**Common pitfalls.** `Input`'s `prefix` prop (e.g. `prefix="short.link/"`) renders as a visually-fused sibling `<span>`, not part of the `<label>` text — so `getByLabelText("Short link")` still matches on just the label's own text, not "short.link/Short link". Worth confirming once by reading the component rather than assuming.
+
+### userEvent vs. fireEvent
+
+**What it is.** `fireEvent.change(input, { target: { value: "x" } })` dispatches one synthetic event with the final value already set. `userEvent.type(input, "x")` simulates each keypress in sequence — `keydown`, `keypress`, `input`, `keyup` per character — the same event sequence a real user's keyboard produces.
+
+**Why it exists in this project.** `Input` is a fully controlled component (`src/components/design-system/forms/Input.tsx` spreads `...rest`, including `value`/`onChange`, straight onto the native `<input>` with no internal value state of its own). `fireEvent.change` would prove the DOM node *can* hold a value; it wouldn't prove the component's `onChange` wiring actually drives that value through React state on every keystroke the way a real user's typing does. `CreateLinkModal.test.tsx`'s "updates the destination URL input as the user types, via real keystrokes" test uses `userEvent.type` specifically so a broken `onChange` (or a `value` prop with no `onChange`, see the standing "controlled inputs" entry above) would actually fail it.
+
+**Where it lives in the codebase.** `src/components/patterns/CreateLinkModal.test.tsx`.
+
+**Common pitfalls.** `userEvent.type` needs `await` — it's async under the hood (real timers between keystrokes by default) — and needs `userEvent.setup()` called once per test, not reused globally, or click/type calls in later tests can interact with stale internal state from an earlier test's setup instance.
+
+### MSW vs. mocking lib/api.ts directly
+
+**What it is.** `msw/node`'s `setupServer` intercepts at the network layer — `src/lib/api.ts`'s real `request()` function runs unmodified, including its own header construction, and only the HTTP response it receives is faked.
+
+**Why it exists in this project.** A `vi.mock("@/lib/api")` stub replaces the exported functions themselves, so nothing inside `request()` ever executes — direct mocking would have skipped past exactly the five behaviors in `api.ts` most worth testing:
+
+1. The `res.status === 204` short-circuit (`api.ts` lines 70-72) that returns `undefined` *before* any `res.json()` call — a mocked `deleteLink` just resolves to whatever the test hands it, proving nothing about that branch existing or running first.
+2. That `ApiError.code`/`message`/`requestId` are actually parsed out of the `{ error: {...} }` JSON envelope, not just present on some object a test constructed by hand.
+3. The 429 path's two-source `retryAfterSeconds` resolution — `body.error.details.retryAfterSeconds` tried first, the `Retry-After` header as fallback (`api.ts` lines 76-81) — two real branches a mock has no reason to exercise unless the mock itself reimplements the same logic, which defeats the point.
+4. The missing-`NEXT_PUBLIC_API_URL` console-error fallback — a module-load-time property of the real file (`BASE_URL` is a top-level `const`), invisible to any mock of `api.ts`'s exports, which is why `src/lib/api.env.test.ts` uses `vi.resetModules()` + a fresh dynamic `import("./api")` instead.
+5. That an aborted `AbortSignal` actually propagates through a real `fetch()` call and rejects as `DOMException("AbortError")` — a mocked function has no `fetch` to abort in the first place.
+
+**How it works mechanically.** `src/test/msw/handlers.ts` defines one handler per `lib/api.ts` endpoint against `TEST_API_URL` (`http://localhost:3000`, matching `vitest.config.ts`'s `test.env.NEXT_PUBLIC_API_URL` exactly — a mismatch here means every request silently fails to match, not a passing test). `src/test/setup.ts` calls `server.listen({ onUnhandledRequest: "error" })`, a deliberate strictness choice: an unmocked request is a test bug (a missing handler, a URL typo), not something to let fall through to a real network call. Individual tests override with `server.use(...)` for a specific status code, delay, or header.
+
+**Where it lives in the codebase.** `src/test/msw/handlers.ts`, `src/test/msw/server.ts`, `src/test/setup.ts`; consumed by every test file that imports `server` from `@/test/msw/server`.
+
+**Common pitfalls.** Forgetting `server.resetHandlers()` in `afterEach` (already wired in `src/test/setup.ts`) would let one test's `server.use()` override leak into the next test file's cases, since MSW's handler stack is process-global for the test run.
+
+### The alias-field-absence test as a regression guard tied to a product decision
+
+**What it is.** `EditLinkModal.test.tsx`'s first test asserts `screen.queryByLabelText("Custom alias")` is `null` — not that some other field exists, specifically that this one doesn't.
+
+**Why it exists in this project.** `EditLinkModal`'s own docblock (`src/components/patterns/EditLinkModal.tsx`, lines 19-20) states the short code — and by extension the alias that generated it — is immutable after creation: "changing it would break every copy already handed out." `CreateLinkModal` visibly has a "Custom alias" field right next to fields `EditLinkModal` does share (destination, expiration, password protection), which makes "just add the same field to Edit" a plausible, easy-looking future change for someone who hasn't read that docblock — and one the API's own `UpdateLinkRequest` type explicitly forbids (`src/types/api.ts`, lines 74-77: "NEVER include `customAlias` or `shortCode` — the API's update schema is strict and 400s on any unrecognized key"). `queryByLabelText` (not `getByLabelText`, which would throw before the assertion even ran) returning `null`, checked with an explicit `toBeNull()`, is what makes this test fail the moment that field is added rather than passing vacuously either way.
+
+**How it works mechanically.** Verified live in this phase's mutation-testing pass (mutation `a`, below): adding the field back in made this exact test fail with the exact diff (`expected <input>… to be null`) it's designed to produce.
+
+**Where it lives in the codebase.** `src/components/patterns/EditLinkModal.test.tsx`.
+
+**Common pitfalls.** A test guarding an *absence* is easy to write vacuously (e.g. asserting on an unrelated field and calling it done). The thing that makes this one real is pairing it with the by-hand mutation that reintroduces the field and confirming the assertion — not just the test file — actually goes red.
+
+### Mutation testing applied to the frontend
+
+**What it is.** The same by-hand methodology `clickscope-api`'s Phase 13a used: introduce one specific, plausible regression at a time, on a scratch (uncommitted) edit, run the targeted test file, record the exact assertion that failed (or didn't), then revert before the next one.
+
+**Why it exists in this project.** A test suite that's never been shown capable of failing is unverified by construction — passing tests prove nothing on their own. Four mutations were chosen to each target one specific claim this phase's tests make: a product decision (alias immutability), a precedence rule (`deriveLinkStatus`'s branch order), and two `AuthContext` behaviors (abort-safety, fragment scrubbing).
+
+**How it works mechanically.** The full result, all four run and reverted in this session:
+
+| # | Mutation | Applied to | Test(s) expected to catch it | Caught? |
+|---|---|---|---|---|
+| a | Add a `customAlias` `Input` to `EditLinkModal`, mirroring `CreateLinkModal`'s field | `src/components/patterns/EditLinkModal.tsx` | `EditLinkModal.test.tsx` — "does not render a custom alias field" | **Yes.** `expected <input class="cs-input cs-input--mono" …> to be null` |
+| b | Reorder `deriveLinkStatus` to check `!link.isActive` before the expiry/click-cap check | `src/lib/deriveLinkStatus.ts` | `deriveLinkStatus.test.ts` — "expired via date beats paused", "expired via click-cap beats paused" | **Yes, both.** `expected 'paused' to be 'expired'` on each |
+| c | Remove the `err.name === "AbortError"` guard in `AuthContext`'s `/me` fetch `.catch` | `src/context/AuthContext.tsx` | `AuthContext.test.tsx` — "does not clear the token when its /me request is aborted by a newer token superseding it" | **Yes.** `expected element to have text content: manual-token, received: null` — the aborted first request's rejection wiped the second, still-valid token |
+| d | Remove `window.history.replaceState(...)` from the fragment-handling branch | `src/context/AuthContext.tsx` | `AuthContext.test.tsx` — "captures a #token= fragment, stores it, and strips the fragment from the URL" | **Yes.** `expected "replaceState" to be called … Number of calls: 0` |
+
+All four were caught by the exact assertion each test was written to make — no incidental catches (mutation 4's `clickProcessor` idempotency case in the API's own Phase 13a, where a database constraint threw before the intended assertion ran, has no equivalent here), and no gaps: every mutation was reverted (`git checkout -- <file>`) and the full suite (`npm test`, 39 tests / 7 files) confirmed green again before moving to the next one.
+
+Note on mutation `c`'s literal wording: the task's phrasing — "remove the AbortError check in one `lib/api.ts` catch block" — doesn't map onto real code as written. `api.ts`'s `request()` never catches at all; an aborted signal's rejection propagates straight out of the `fetch()` call to whichever *caller* awaits it. The actual `err.name === "AbortError"` guards live in the callers (`AuthContext.tsx`, `DashboardInteractive.tsx`), so this mutation targeted `AuthContext`'s guard instead, since that's the one with a dedicated test (`AuthContext.test.tsx`) built specifically to catch its removal.
+
+**Where it lives in the codebase.** `src/components/patterns/EditLinkModal.tsx` (a), `src/lib/deriveLinkStatus.ts` (b), `src/context/AuthContext.tsx` (c, d).
+
+**Common pitfalls.** None hit in this pass, but worth naming per the API repo's own Phase 13a finding: a mutation "being caught" isn't automatically the same as "being caught for the right reason" — every catch above was confirmed against the specific assertion text, not just a red exit code, precisely to rule that out.
+
+### Why the E2E click flow is async, and what toPass buys over a fixed sleep
+
+**What it is.** `e2e/click-flow.spec.ts` visits the created short link's redirect URL from a second browser context, then polls the dashboard (via `expect(async () => {...}).toPass(...)`, reloading on each attempt) until the click count updates, rather than asserting immediately or after a fixed delay.
+
+**Why it exists in this project.** Per `clickscope-api`'s Phase 9 ("Background Jobs"), the redirect route enqueues a BullMQ job (`enqueueClick`, `src/queues/clickQueue.ts`) instead of writing the click row on the request path; a separate `worker/` process (`worker/processors/clickProcessor.ts`) performs the actual Postgres write, communicating with the API only through Redis. That means the moment the visitor's redirect request completes, the click has **not yet** landed in the database — there's a real, variable-length gap (queue latency plus worker processing time) before a dashboard refetch would see it. A fixed `page.waitForTimeout(N)` would have to guess that gap's upper bound: too short and the test is flaky under any worker slowdown; padded safely long and every run wastes wall-clock time waiting past the moment the job actually finished, for no added correctness.
+
+**How it works mechanically.** `expect(async () => { await page.reload(); await expect(clicksCell).toHaveText("1"); }).toPass({ timeout: 20_000, intervals: [500, 1000, 2000] })` re-runs the entire callback — reload included, since a stale DOM node would never observe a change no matter how long it's polled — on a backoff schedule until the inner assertion passes or the outer timeout elapses. This converges on the actual completion time from either direction: fast when the worker is fast, still correct (not flaky) when it's briefly slower.
+
+**Where it lives in the codebase.** `e2e/click-flow.spec.ts`.
+
+**Production considerations.** This test was run against the real stack in this session (Postgres + Redis via the existing `docker compose up -d` containers, `npm run dev` and `npm run worker:dev` in `clickscope-api`, this repo's own dev server autostarted by `playwright.config.ts`'s `webServer`) and passed in 1.6s — the queue/worker round trip in local dev is fast enough that the very first `toPass` attempt succeeded, no visible retry needed. That's a property of local dev latency, not a guarantee `toPass` relies on; the mechanism is correct regardless of how many attempts it actually takes.
+
+### E2E setup requirements and the Phase 15 CI gap
+
+**What it is.** `e2e/click-flow.spec.ts` requires four live processes: `clickscope-api`'s Postgres + Redis (`docker compose up -d` in that repo), the API itself (`npm run dev`), its worker (`npm run worker:dev`), and this repo's dev server (autostarted by `playwright.config.ts`'s `webServer`, reusing one already running via `reuseExistingServer`).
+
+**Why it exists in this project.** The test exercises the real signup → create-link → redirect → queue → worker → stats round trip on purpose (see above) — no MSW, no mocked worker. That's the entire point of having exactly one E2E test alongside an otherwise-mocked unit/component suite, but it means the test cannot run in isolation the way `npm test` can.
+
+**Where it lives in the codebase.** `playwright.config.ts` (this repo), `docker-compose.yml`/`package.json`'s `dev`/`worker:dev` scripts (`clickscope-api`).
+
+**Production considerations.** Neither repo has any CI configuration today. Wiring this test into CI (Phase 15, per this repo's own convention of naming forward-looking gaps rather than solving them early) will need, at minimum: a Postgres + Redis service in the CI runner (or the existing `docker-compose.yml`, reused), running `clickscope-api`'s migrations before the API starts, starting the API and worker as background processes the CI job can also tear down, and only then starting this repo's own `npm run test:e2e`. None of that infrastructure exists yet — this section documents the requirement, not a solution.
+
+### What's not worth testing here, and why
+
+**What it is.** Three deliberate boundaries on this phase's scope, named explicitly rather than left as silent gaps:
+
+- The generic design-system primitives (`Input`, `Button`, `Modal`, `Toast` — `src/components/design-system/`) have no dedicated unit test files. They're thin wrappers that spread props onto native elements with no logic of their own beyond that; every one of them is already exercised indirectly through every pattern-component test that renders them (`CreateLinkModal.test.tsx` exercises `Input`'s controlled-value wiring and `Button`'s `loading`/`disabled` combination; `EditLinkModal.test.tsx` exercises `Modal`'s dialog role and `Button`'s `saving`-prop-driven disable). A standalone `Input.test.tsx` would just re-assert "a controlled input reflects its value prop," which is React's own contract, not this app's.
+- `googleAuthUrl()` (`src/lib/api.ts`) is a pure string template — `` `${BASE_URL}/api/auth/google` `` — not a `fetch` call; it doesn't touch MSW, error parsing, or any of the behaviors this phase's `api.ts` tests target, so it's out of scope here rather than overlooked.
+- `Pagination` and `DeleteConfirmModal` (`src/components/patterns/`) have no tests this phase. They weren't named in this phase's explicit scope, and neither backs a specific product decision or precedence rule the way the alias-absence guard does — a plausible next addition, not a current gap.
+
+**Why it exists in this project.** Coverage-for-its-own-sake pulls effort toward whatever's cheapest to test next, not toward what's actually at risk of a real regression — the same argument `clickscope-api`'s Phase 13a made about chasing a coverage percentage up. Every test this phase added targets something with an actual, statable failure mode: a precedence rule, an error-parsing branch, a product decision, an async state-clearing bug. Primitives, a string template, and untouched patterns don't have one of those to point to yet.
+
