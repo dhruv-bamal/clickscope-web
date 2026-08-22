@@ -1,0 +1,17 @@
+node_modules
+.next
+coverage
+playwright-report
+test-results
+e2e
+.git
+.gitignore
+.env*
+!.env*.example
+*.log
+*.tsbuildinfo
+Notes.md
+CLAUDE.md
+AGENTS.md
+.github
+.claude

@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm run lint
+
+      - name: Cache .next/cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+
+      # Proves the client/server component boundary is legal, not just that
+      # types check -- a hook or event handler that crossed into a Server
+      # Component fails here specifically, at build/render time, not at
+      # typecheck. See providers.tsx / DashboardInteractive.tsx / Notes.md
+      # "Phase 12a" for the concrete shape of that failure in this app.
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3000
+
+      - run: npm test
+
+  generated-types-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: clickscope-web
+
+      # Anonymous clone -- both repos are public, no PAT/secret needed.
+      # token: '' forces an unauthenticated clone rather than trying (and
+      # possibly failing) to use this job's own repo-scoped GITHUB_TOKEN
+      # against a different repository.
+      - uses: actions/checkout@v4
+        with:
+          repository: dhruv-bamal/clickscope-api
+          path: clickscope-api
+          token: ''
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: clickscope-web/.nvmrc
+          cache: npm
+          cache-dependency-path: clickscope-web/package-lock.json
+
+      - working-directory: clickscope-web
+        run: npm ci
+
+      # types:generate reads ../clickscope-api/openapi.json relative to
+      # clickscope-web's own cwd -- the two checkout `path:` values above
+      # are chosen specifically so that relative path resolves correctly.
+      - working-directory: clickscope-web
+        run: npm run types:generate
+
+      - working-directory: clickscope-web
+        run: git diff --exit-code src/types/generated/
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Verifies the Dockerfile itself, not just `npm run build` -- two
+      # things only this job catches: (1) the standalone output's static
+      # asset copy paths are actually correct, since a plain `next build`
+      # never assembles them into a servable image; (2) NEXT_PUBLIC_API_URL
+      # actually threads through the ARG, not just that some value exists
+      # in the environment `next build` happened to run in locally.
+      - run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL=http://localhost:3000 \
+            -t clickscope-web:ci .
+
+      # Boot-smoke test: a successful `docker build` only proves the image
+      # assembles -- it never runs the container, so it can't catch a
+      # boot-time crash or a wrong file layout. No Postgres/Redis needed
+      # here (unlike clickscope-api's docker-build job) -- every route in
+      # this app prerenders statically at build time, so a plain curl
+      # against a served page never touches the backend.
+      - name: Boot-smoke test the image
+        run: |
+          docker run -d --name smoke-web -p 3000:3000 clickscope-web:ci
+
+          code=000
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/login)
+            if [ "$code" = "200" ]; then
+              echo "web responded with HTTP $code after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "web never returned 200 on /login within 30s (last code: $code)"
+          docker logs smoke-web
+          exit 1
+
+      # Concrete check for the standalone static-copy gotcha: server up, but
+      # CSS/JS 404ing because .next/static wasn't copied to
+      # .next/standalone/.next/static at the right path.
+      - name: Verify static assets are served
+        run: |
+          html=$(curl -s http://localhost:3000/login)
+          asset_path=$(echo "$html" | grep -oE '/_next/static/[^"]+\.(js|css)' | head -1)
+          if [ -z "$asset_path" ]; then
+            echo "could not find a /_next/static asset reference in /login's HTML"
+            exit 1
+          fi
+          code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:3000${asset_path}")
+          if [ "$code" != "200" ]; then
+            echo "static asset $asset_path returned $code, expected 200"
+            exit 1
+          fi
+          echo "static asset $asset_path served correctly"
+
+      - name: Stop smoke-test container
+        if: always()
+        run: docker rm -f smoke-web >/dev/null 2>&1 || true

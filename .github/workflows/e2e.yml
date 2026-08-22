@@ -1,0 +1,130 @@
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # 06:00 UTC nightly. GitHub automatically emails repo watchers / the
+    # workflow's configured recipients when a SCHEDULED run fails -- no
+    # extra notification integration needed for that. The real risk this
+    # doesn't solve: GitHub auto-disables `schedule` triggers after 60 days
+    # of zero activity on the repository -- if this workflow silently stops
+    # appearing in the Actions tab, that's the first thing to check, and
+    # nothing in this file can detect its own disablement.
+    - cron: '0 6 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: clickscope
+          POSTGRES_PASSWORD: clickscope
+          POSTGRES_DB: clickscope_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clickscope"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: clickscope-web
+
+      # Anonymous clone -- both repos are public, no PAT/secret needed.
+      - uses: actions/checkout@v4
+        with:
+          repository: dhruv-bamal/clickscope-api
+          path: clickscope-api
+          token: ''
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: clickscope-web/.nvmrc
+          cache: npm
+          cache-dependency-path: |
+            clickscope-web/package-lock.json
+            clickscope-api/package-lock.json
+
+      - name: Install clickscope-api deps
+        working-directory: clickscope-api
+        run: npm ci
+
+      # .env.test.example already sets PORT=3000, DATABASE_URL/REDIS_URL
+      # matching the service containers above, and FRONTEND_URL=
+      # http://localhost:5173 -- exactly this scenario. clickscope-api's
+      # dev/migrate/worker:dev scripts all hardcode --env-file=.env, so this
+      # copy (not an env: block) is what actually wires values through.
+      - name: Configure clickscope-api env
+        working-directory: clickscope-api
+        run: cp .env.test.example .env
+
+      - name: Run clickscope-api migrations
+        working-directory: clickscope-api
+        run: npm run migrate:up
+
+      - name: Start clickscope-api
+        working-directory: clickscope-api
+        run: nohup npm run dev > api.log 2>&1 &
+
+      - name: Wait for clickscope-api
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/health || echo 000)
+            if [ "$code" != "000" ]; then
+              echo "api responded after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "clickscope-api never came up"
+          cat clickscope-api/api.log
+          exit 1
+
+      - name: Start clickscope-api worker
+        working-directory: clickscope-api
+        run: nohup npm run worker:dev > worker.log 2>&1 &
+
+      - name: Install clickscope-web deps
+        working-directory: clickscope-web
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: clickscope-web
+        run: npx playwright install --with-deps chromium
+
+      # playwright.config.ts's own webServer block boots `npm run dev` on
+      # :5173 and is already CI-aware (reuseExistingServer:
+      # !process.env.CI -- GitHub Actions sets CI=true by default), so no
+      # separate frontend-boot step is needed here.
+      - name: Run E2E tests
+        working-directory: clickscope-web
+        run: npm run test:e2e
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3000
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-failure-logs
+          path: |
+            clickscope-api/api.log
+            clickscope-api/worker.log
+            clickscope-web/playwright-report
+          retention-days: 7
